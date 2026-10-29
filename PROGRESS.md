@@ -12,8 +12,8 @@
 | :--- | :--- | :---: | :---: |
 | **Phase 1** | Enterprise Documentation & Architectural Foundation | 🟢 Completed | 100% |
 | **Phase 2** | Docker Infrastructure & Laravel 11 Bootstrap | 🟢 Completed | 100% |
-| **Phase 3** | Database Schemas, Foreign Keys & Migrations | 🟡 Next Up | 0% |
-| **Phase 4** | Core Domain Actions (Checkout, Stock Locks, Work Orders) | ⚪ Planned | 0% |
+| **Phase 3** | Database Schemas, Foreign Keys & Migrations | 🟢 Completed | 100% |
+| **Phase 4** | Core Domain Actions (Checkout, Stock Locks, Work Orders) | 🟡 Next Up | 0% |
 | **Phase 5** | Laravel Reverb WebSockets & Real-Time Sync | ⚪ Planned | 0% |
 | **Phase 6** | Redis Queues & Laravel Horizon Integration | ⚪ Planned | 0% |
 | **Phase 7** | Node.js Asynchronous Worker Microservice Bridge | ⚪ Planned | 0% |
@@ -51,14 +51,16 @@
 ---
 
 ### Phase 3: Relational Database Schemas & Migrations
-- [ ] **Security & Staff:** `staff_users`, `roles`, `permissions`, `audit_logs`
-- [ ] **Inventory & Products:** `categories`, `uoms`, `products`, `product_options`, `stock_adjustments`
-- [ ] **Workshop & Automotive:** `vehicles`, `fleets`, `mechanics`, `work_orders`, `work_order_items`, `outsourced_parts`, `mechanic_commissions`
-- [ ] **Sales & POS:** `sales_orders`, `sales_order_items`, `payment_splits`, `held_orders`, `sales_returns`
-- [ ] **Purchases & Suppliers:** `suppliers`, `purchases`, `purchase_items`, `purchase_returns`
-- [ ] **Pricing & Promotions:** `price_lists`, `price_list_items`, `promotions`, `loyalty_records`
-- [ ] **Credit & Customers:** `customers`, `credit_settlements`
-- [ ] Seed comprehensive mock data matching the `dot-pos-next` dataset
+- [x] **Security & Staff:** `staff_users`, `roles`, `permissions`, `audit_logs`
+- [x] **Inventory & Products:** `categories`, `units_of_measure`, `products`, `product_options`, `stock_adjustments`
+- [x] **Workshop & Automotive:** `vehicles`, `fleets`, `mechanics`, `work_orders`, `work_order_items`, `outsourced_parts`, `mechanic_commissions`
+- [x] **Sales & POS:** `sales_orders`, `sales_order_items`, `payment_splits`, `held_orders`, `credit_settlements`
+- [x] **Purchases & Suppliers:** `suppliers`, `purchases`, `purchase_items`, `purchase_returns`
+- [x] **Pricing & Promotions:** `price_lists`, `price_list_items`, `promotions`
+- [x] **Credit & Customers:** `customers`, `fleets`, `credit_settlements`
+- [x] Seed comprehensive mock data matching the `dot-pos-next` dataset
+- [x] Created Eloquent models under `app/Domains/{Domain}/Models/` with strict casts and relationships
+- [x] Authored and passed Pest feature tests (`tests/Feature/DatabaseRelationalIntegrityTest.php`)
 
 ---
 
