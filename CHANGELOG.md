@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Phase 4 Implementation:**
+  - `DeductStockAction` & `ReplenishStockAction`: Concurrency control with Pessimistic Row Locking (`lockForUpdate()`), preventing overselling and supporting variant option stock.
+  - `ProcessCheckoutAction`: ACID transaction orchestration, multi-tender payment splits (Cash, KPay, Card, Credit), credit debt accounting, loyalty points accrual, and idempotency key safeguard.
+  - `ConvertWorkOrderToInvoiceAction`: Converts automotive Job Cards to official Invoices, automatically deducting physical inventory for fitted car parts and issuing invoices.
+  - `CalculateMechanicCommissionAction`: Automatically calculates and logs technician commission on labor fees.
+  - `SettleCustomerCreditAction`: Transactional debt settlement, due balance decrement, and sequential receipt issuance.
+  - `ResolveDynamicPriceAction`: Customer-tier price list and volume break tier evaluation.
+  - Custom exceptions: `InsufficientStockException` (HTTP 422) and `CreditLimitExceededException` (HTTP 422).
+  - Feature test suite: `tests/Feature/DomainActionsTest.php` with 7 comprehensive assertions (100% pass).
+
 - **Phase 3 Implementation:**
   - 7 comprehensive database migration files creating 20 relational tables covering:
     - Roles (`roles`) & Staff (`staff_users`) with RBAC JSON permissions and audit logs (`audit_logs`).

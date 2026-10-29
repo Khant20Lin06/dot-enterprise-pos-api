@@ -13,8 +13,8 @@
 | **Phase 1** | Enterprise Documentation & Architectural Foundation | 🟢 Completed | 100% |
 | **Phase 2** | Docker Infrastructure & Laravel 11 Bootstrap | 🟢 Completed | 100% |
 | **Phase 3** | Database Schemas, Foreign Keys & Migrations | 🟢 Completed | 100% |
-| **Phase 4** | Core Domain Actions (Checkout, Stock Locks, Work Orders) | 🟡 Next Up | 0% |
-| **Phase 5** | Laravel Reverb WebSockets & Real-Time Sync | ⚪ Planned | 0% |
+| **Phase 4** | Core Domain Actions (Checkout, Stock Locks, Work Orders) | 🟢 Completed | 100% |
+| **Phase 5** | Laravel Reverb WebSockets & Real-Time Sync | 🟡 Next Up | 0% |
 | **Phase 6** | Redis Queues & Laravel Horizon Integration | ⚪ Planned | 0% |
 | **Phase 7** | Node.js Asynchronous Worker Microservice Bridge | ⚪ Planned | 0% |
 | **Phase 8** | Pest PHP Automated Test Suite (Feature & Concurrency) | ⚪ Planned | 0% |
@@ -65,12 +65,14 @@
 ---
 
 ### Phase 4: Core Domain Actions & Business Logic
-- [ ] `ProcessCheckoutAction` (ACID transaction, Pessimistic row locking via `lockForUpdate()`, payment splits)
-- [ ] `DeductStockAction` & `ReplenishStockAction`
-- [ ] `CreateWorkOrderAction` & `ConvertWorkOrderToInvoiceAction` (Parts auto-deducted from stock catalog)
-- [ ] `CalculateMechanicCommissionAction` (Auto compute labor percentage & log commission)
-- [ ] `SettleCustomerCreditAction` (Partial & Full settlement with receipt ledger)
-- [ ] `ResolveDynamicPriceAction` (Customer tier + Volume break price evaluation)
+- [x] `ProcessCheckoutAction` (ACID transaction, Pessimistic row locking via `lockForUpdate()`, payment splits)
+- [x] `DeductStockAction` & `ReplenishStockAction`
+- [x] `ConvertWorkOrderToInvoiceAction` (Parts auto-deducted from stock catalog & mechanic commission)
+- [x] `CalculateMechanicCommissionAction` (Auto compute labor percentage & log commission)
+- [x] `SettleCustomerCreditAction` (Partial & Full settlement with receipt ledger)
+- [x] `ResolveDynamicPriceAction` (Customer tier + Volume break price evaluation)
+- [x] Custom exceptions: `InsufficientStockException` and `CreditLimitExceededException`
+- [x] Comprehensive Pest feature test suite: `tests/Feature/DomainActionsTest.php` (100% pass)
 
 ---
 
