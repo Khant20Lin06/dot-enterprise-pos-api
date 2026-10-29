@@ -1,0 +1,15 @@
+{
+  "name": "dot-pos-node-worker",
+  "version": "1.0.0",
+  "description": "Asynchronous microservice worker for thermal receipt rendering & bulk barcode generation",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "bwip-js": "^4.5.1",
+    "cors": "^2.8.5",
+    "express": "^4.21.1",
+    "ioredis": "^5.4.1"
+  }
+}
