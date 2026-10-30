@@ -29,6 +29,7 @@
 | **Phase F** | Enterprise Red-Team Hardening & Vulnerability Remediation (CRIT-01 to CRIT-04, HIGH-01 to HIGH-04, MED-01 to MED-03) | 🟢 Completed | 100% |
 | **Phase G** | Multi-UOM Packaging Conversions & Automotive Vehicle Fitment Matrix (Drum/Box/Carton, ACES/PIES compatibility) | 🟢 Completed | 100% |
 | **Phase H** | Master Data CRUD, Inbound Procurement & Workshop Workflow Harmonization (Customers, Vehicles, Purchases, Suppliers, Stock Adjustments) | 🟢 Completed | 100% |
+| **Phase I** | Forensic Hardening: Red-Team Security, Concurrency Locking & Anti-Drift Variant Stock | 🟢 Completed | 100% |
 
 ---
 
@@ -288,3 +289,33 @@
   - `tests/Feature/PurchasesAndSuppliersTest.php`: 3 passed (22 assertions).
   - `tests/Feature/WorkshopWorkflowAndPricingAlignmentTest.php`: 5 passed (23 assertions).
   - Full Test Suite: **115 passed (573 assertions) — 100% pass rate in 6.22s**.
+
+---
+
+### Phase I: Forensic Hardening: Red-Team Security, Concurrency Locking & Anti-Drift Variant Stock
+- [x] **Granular RBAC Authorization on Read/Reconnaissance Endpoints:**
+  - Secured all sensitive `GET` routes with `CheckPermission` middleware in `routes/api.php`:
+    - `GET /api/v1/suppliers` & `GET /api/v1/suppliers/{id}` -> `permission:purchases,view` (prevents supplier debt data leakage).
+    - `GET /api/v1/roles`, `GET /api/v1/roles/{id}`, `GET /api/v1/roles/permissions-catalog` -> `permission:settings,manageRoles` (blocks role catalog enumeration).
+    - `GET /api/v1/warehouses`, `GET /api/v1/warehouses/{id}`, `GET /api/v1/warehouses/{id}/stocks` -> `permission:inventory,view`.
+    - `GET /api/v1/products`, `/categories`, `/units-of-measure`, `/attributes`, `/stock-transfers` -> `permission:inventory,view`.
+- [x] **Burst & DoS Protection (Rate Limiting on Financial/Inventory Mutations):**
+  - Applied IP-based `throttle:60,1` (and `throttle:30,1` on sessions) on mutation endpoints in `routes/api.php`:
+    - `POST /api/v1/pos/checkout`, `POST /api/v1/pos/orders/{id}/reprint`
+    - `POST /api/v1/pos/sessions/open`, `POST /api/v1/pos/sessions/{id}/close`
+    - `POST /api/v1/payments/generate-qr`
+    - `POST /api/v1/sales-returns`
+    - `POST /api/v1/workshop/work-orders`, `PUT /work-orders/{id}`, `PATCH /work-orders/{id}/status`, `POST /work-orders/{id}/cancel`, `POST /work-orders/{id}/convert-to-invoice`
+    - `POST /api/v1/purchases`, `POST /purchases/{id}/receive`, `POST /purchases/{id}/cancel`
+    - `POST /api/v1/stock-adjustments`
+- [x] **Concurrency & Race Condition Elimination in Workshop Operations:**
+  - `WorkOrderController::update`: Wrapped inside atomic `DB::transaction()` with pessimistic row lock (`lockForUpdate()`), completely eliminating TOCTOU race conditions where mechanic item edits collide with cashier invoice conversion.
+  - `WorkOrderController::updateStatus` & `cancel`: Hardened with pessimistic row locks and atomic transactions, preventing lost updates and race collisions with invoicing.
+- [x] **Anti-Drift Physical Warehouse Stock Synchronization:**
+  - `GenerateVariantMatrixAction`: Automatically updates or creates target `warehouse_stocks` records matching total generated variant stock, ensuring physical warehouse inventory and master product stock never diverge.
+- [x] **Sanctum Token Lifetime & Environment Hardening:**
+  - `AuthController::login`: Automatically revokes existing `pos-token%` tokens upon re-authentication, preventing unbounded token accumulation.
+  - `PaymentGatewayController::simulateWebhook`: Strictly restricted to non-production environments (`local`, `testing`), blocking unauthorized simulated webhook callbacks in production.
+- [x] **Pest Feature Test Suite:**
+  - `tests/Feature/Phase1SecurityAndConcurrencyTest.php`: 7 passed (25 assertions).
+  - Full Test Suite: **122 passed (598 assertions) — 100% pass rate in 12.29s**.

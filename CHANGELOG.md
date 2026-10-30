@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Phase I Implementation: Forensic Hardening: Red-Team Security, Concurrency Locking & Anti-Drift Variant Stock:**
+  - **Granular RBAC Authorization on Read/Reconnaissance Endpoints:**
+    - Attached `permission:purchases,view` to `GET /api/v1/suppliers` and `GET /api/v1/suppliers/{id}` to prevent unauthorized staff from viewing supplier debts and vendor contracts.
+    - Attached `permission:settings,manageRoles` to `GET /api/v1/roles`, `GET /api/v1/roles/{id}`, and `GET /api/v1/roles/permissions-catalog` to eliminate role catalog enumeration.
+    - Attached `permission:inventory,view` to `GET /api/v1/products`, `/categories`, `/units-of-measure`, `/attributes`, `/warehouses`, and `/stock-transfers`.
+  - **Burst & Flooding Protection (Rate Limiting on Financial/Inventory Mutations):**
+    - Added `throttle:60,1` and `throttle:30,1` middleware to financial and inventory mutation routes (`/pos/checkout`, `/purchases`, `/sales-returns`, `/stock-adjustments`, `/workshop/work-orders`, `/pos/sessions/open`, `/payments/generate-qr`).
+  - **Concurrency & TOCTOU Race Condition Elimination:**
+    - `WorkOrderController::update`: Wrapped inside atomic `DB::transaction()` with pessimistic row lock (`WorkOrder::where('id', $id)->lockForUpdate()->firstOrFail()`), strictly blocking concurrent item deletion/modification when cashier is converting job card to invoice.
+    - `WorkOrderController::updateStatus` & `WorkOrderController::cancel`: Hardened with transactional pessimistic locking to prevent lost updates and invalid state transitions.
+  - **Single Source of Truth Variant Inventory Alignment:**
+    - `GenerateVariantMatrixAction`: Automatically updates/creates `WarehouseStock` records for target warehouse to eliminate stock drift between central product stock and physical warehouse stock.
+  - **Sanctum Token Lifetime & Environment Hardening:**
+    - `AuthController::login`: Automatically revokes existing `pos-token%` tokens before generating new tokens upon email/password login to prevent unbounded token accumulation.
+    - `PaymentGatewayController::simulateWebhook`: Strictly restricted to `local` and `testing` environments with 403 Forbidden on production.
+  - **Automated Pest Feature Test Suite:**
+    - `tests/Feature/Phase1SecurityAndConcurrencyTest.php`: 7 new tests verifying read route RBAC barriers, pessimistic lock TOCTOU protections, variant matrix warehouse synchronization, token pruning, and production webhook restrictions.
+    - Repository Test Suite: **122 passed (598 assertions) — 100% pass rate**.
 - **Phase H Implementation: Master Data CRUD, Inbound Procurement & Workshop Workflow Harmonization:**
   - **Critical Bug Fixes:**
     - Corrected column name in `CustomerCreditController` from non-existent `current_due` to `due_amount`, preventing Fatal 500 error on MySQL 8.0.

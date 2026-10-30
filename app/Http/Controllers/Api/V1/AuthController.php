@@ -41,6 +41,9 @@ class AuthController extends Controller
             'workstation' => $workstation,
         ]);
 
+        // Revoke stale login session tokens to prevent unbounded token accumulation
+        $staff->tokens()->where('name', 'like', 'pos-token%')->delete();
+
         $token = $staff->createToken("pos-token-{$staff->id}", ['*'])->plainTextToken;
 
         AuditLog::create([

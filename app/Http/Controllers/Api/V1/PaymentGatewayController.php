@@ -98,10 +98,17 @@ class PaymentGatewayController extends Controller
     }
 
     /**
-     * Alias for simulateWebhook backwards compatibility
+     * Alias for simulateWebhook backwards compatibility (Restricted to non-production environments).
      */
     public function simulateWebhook(SimulatePaymentWebhookRequest $request, PaymentGatewayManager $gatewayManager): JsonResponse
     {
+        if (! app()->environment('local', 'testing')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Simulate webhook endpoint is strictly disabled in production environment.',
+            ], 403);
+        }
+
         return $this->handleWebhook($request, $gatewayManager);
     }
 }

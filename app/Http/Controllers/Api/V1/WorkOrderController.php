@@ -134,69 +134,75 @@ class WorkOrderController extends Controller
 
     /**
      * Update automotive Job Card complaint, details, or line items.
+     * Hardened with Pessimistic Row Locking to eliminate TOCTOU race conditions.
      */
     public function update(UpdateWorkOrderRequest $request, int $id): JsonResponse
     {
-        $workOrder = WorkOrder::with('items')->findOrFail($id);
-
-        if (in_array($workOrder->status, ['Completed / Invoiced', 'Cancelled'])) {
-            return response()->json([
-                'success' => false,
-                'message' => "Cannot update Job Card #{$workOrder->job_card_no} with status '{$workOrder->status}'.",
-            ], 422);
-        }
-
         $validated = $request->validated();
 
-        $updated = DB::transaction(function () use ($workOrder, $validated) {
-            if (isset($validated['items'])) {
-                // Delete existing items and recreate
-                $workOrder->items()->delete();
+        try {
+            $updated = DB::transaction(function () use ($id, $validated) {
+                $workOrder = WorkOrder::where('id', $id)->lockForUpdate()->firstOrFail();
 
-                $partsTotal = 0.00;
-                $laborTotal = 0.00;
-
-                foreach ($validated['items'] as $item) {
-                    $itemTotal = (float) $item['unit_price'] * (int) $item['qty'];
-                    if (($item['item_type'] ?? 'part') === 'labor') {
-                        $laborTotal += $itemTotal;
-                    } else {
-                        $partsTotal += $itemTotal;
-                    }
-
-                    WorkOrderItem::create([
-                        'work_order_id' => $workOrder->id,
-                        'product_id' => $item['product_id'],
-                        'item_type' => $item['item_type'] ?? 'part',
-                        'name' => $item['name'] ?? 'Workshop Item',
-                        'qty' => $item['qty'],
-                        'unit_price' => $item['unit_price'],
-                        'subtotal' => $itemTotal,
-                        'is_approved' => $item['is_approved'] ?? true,
-                    ]);
+                if (in_array($workOrder->status, ['Completed / Invoiced', 'Cancelled'])) {
+                    throw new \DomainException("Cannot update Job Card #{$workOrder->job_card_no} with status '{$workOrder->status}'.");
                 }
 
-                $workOrder->parts_total = $partsTotal;
-                $workOrder->labor_fee = $laborTotal;
-                $workOrder->total_amount = $partsTotal + $laborTotal;
-            }
+                if (isset($validated['items'])) {
+                    // Delete existing items and recreate atomically under lock
+                    $workOrder->items()->delete();
 
-            $fillable = array_diff_key($validated, ['items' => true]);
-            $workOrder->fill($fillable);
-            $workOrder->save();
+                    $partsTotal = 0.00;
+                    $laborTotal = 0.00;
 
-            return $workOrder->fresh(['customer', 'vehicle', 'serviceAdvisor', 'primaryMechanic', 'items.product']);
-        });
+                    foreach ($validated['items'] as $item) {
+                        $itemTotal = (float) $item['unit_price'] * (int) $item['qty'];
+                        if (($item['item_type'] ?? 'part') === 'labor') {
+                            $laborTotal += $itemTotal;
+                        } else {
+                            $partsTotal += $itemTotal;
+                        }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Job Card updated successfully.',
-            'data' => new WorkOrderResource($updated),
-        ]);
+                        WorkOrderItem::create([
+                            'work_order_id' => $workOrder->id,
+                            'product_id' => $item['product_id'],
+                            'item_type' => $item['item_type'] ?? 'part',
+                            'name' => $item['name'] ?? 'Workshop Item',
+                            'qty' => $item['qty'],
+                            'unit_price' => $item['unit_price'],
+                            'subtotal' => $itemTotal,
+                            'is_approved' => $item['is_approved'] ?? true,
+                        ]);
+                    }
+
+                    $workOrder->parts_total = $partsTotal;
+                    $workOrder->labor_fee = $laborTotal;
+                    $workOrder->total_amount = $partsTotal + $laborTotal;
+                }
+
+                $fillable = array_diff_key($validated, ['items' => true]);
+                $workOrder->fill($fillable);
+                $workOrder->save();
+
+                return $workOrder->fresh(['customer', 'vehicle', 'serviceAdvisor', 'primaryMechanic', 'items.product']);
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Job Card updated successfully.',
+                'data' => new WorkOrderResource($updated),
+            ]);
+        } catch (\DomainException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 
     /**
      * Transition Job Card status and broadcast WebSocket update.
+     * Hardened with Pessimistic Row Locking to prevent race conditions and lost updates.
      */
     public function updateStatus(Request $request, int $id): JsonResponse
     {
@@ -204,50 +210,67 @@ class WorkOrderController extends Controller
             'status' => ['required', 'string', 'in:Intake / Estimate,Under Inspection,In Progress,Waiting for Parts,QC & Ready,Cancelled'],
         ]);
 
-        $workOrder = WorkOrder::findOrFail($id);
+        try {
+            [$workOrder, $prevStatus] = DB::transaction(function () use ($id, $request) {
+                $workOrder = WorkOrder::where('id', $id)->lockForUpdate()->firstOrFail();
 
-        if ($workOrder->status === 'Completed / Invoiced') {
+                if ($workOrder->status === 'Completed / Invoiced') {
+                    throw new \DomainException("Cannot change status of invoiced Job Card #{$workOrder->job_card_no}.");
+                }
+
+                $prevStatus = $workOrder->status;
+                $workOrder->update(['status' => $request->status]);
+
+                return [$workOrder, $prevStatus];
+            });
+
+            event(new WorkOrderStatusChangedEvent($workOrder->fresh(['vehicle', 'customer']), $prevStatus));
+
+            return response()->json([
+                'success' => true,
+                'message' => "Job Card status transitioned to '{$request->status}'.",
+                'data' => new WorkOrderResource($workOrder->fresh(['customer', 'vehicle', 'serviceAdvisor', 'primaryMechanic', 'items.product'])),
+            ]);
+        } catch (\DomainException $e) {
             return response()->json([
                 'success' => false,
-                'message' => "Cannot change status of invoiced Job Card #{$workOrder->job_card_no}.",
+                'message' => $e->getMessage(),
             ], 422);
         }
-
-        $prevStatus = $workOrder->status;
-        $workOrder->update(['status' => $request->status]);
-
-        event(new WorkOrderStatusChangedEvent($workOrder->fresh(['vehicle', 'customer']), $prevStatus));
-
-        return response()->json([
-            'success' => true,
-            'message' => "Job Card status transitioned to '{$request->status}'.",
-            'data' => new WorkOrderResource($workOrder->fresh(['customer', 'vehicle', 'serviceAdvisor', 'primaryMechanic', 'items.product'])),
-        ]);
     }
 
     /**
      * Cancel an active Job Card.
+     * Hardened with Pessimistic Row Locking to prevent conflicting invoice transitions.
      */
     public function cancel(int $id): JsonResponse
     {
-        $workOrder = WorkOrder::findOrFail($id);
+        try {
+            [$workOrder, $prevStatus] = DB::transaction(function () use ($id) {
+                $workOrder = WorkOrder::where('id', $id)->lockForUpdate()->firstOrFail();
 
-        if ($workOrder->status === 'Completed / Invoiced') {
+                if ($workOrder->status === 'Completed / Invoiced') {
+                    throw new \DomainException("Cannot cancel an invoiced Job Card #{$workOrder->job_card_no}.");
+                }
+
+                $prevStatus = $workOrder->status;
+                $workOrder->update(['status' => 'Cancelled']);
+
+                return [$workOrder, $prevStatus];
+            });
+
+            event(new WorkOrderStatusChangedEvent($workOrder->fresh(['vehicle', 'customer']), $prevStatus));
+
+            return response()->json([
+                'success' => true,
+                'message' => "Job Card #{$workOrder->job_card_no} has been cancelled.",
+            ]);
+        } catch (\DomainException $e) {
             return response()->json([
                 'success' => false,
-                'message' => "Cannot cancel an invoiced Job Card #{$workOrder->job_card_no}.",
+                'message' => $e->getMessage(),
             ], 422);
         }
-
-        $prevStatus = $workOrder->status;
-        $workOrder->update(['status' => 'Cancelled']);
-
-        event(new WorkOrderStatusChangedEvent($workOrder->fresh(['vehicle', 'customer']), $prevStatus));
-
-        return response()->json([
-            'success' => true,
-            'message' => "Job Card #{$workOrder->job_card_no} has been cancelled.",
-        ]);
     }
 
     /**

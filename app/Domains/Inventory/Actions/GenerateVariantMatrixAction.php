@@ -5,6 +5,8 @@ namespace App\Domains\Inventory\Actions;
 use App\Domains\Inventory\Models\AttributeValue;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\ProductVariant;
+use App\Domains\Inventory\Models\Warehouse;
+use App\Domains\Inventory\Models\WarehouseStock;
 use App\Domains\SecurityAndAudit\Models\AuditLog;
 use DomainException;
 use Illuminate\Database\Eloquent\Collection;
@@ -86,10 +88,25 @@ class GenerateVariantMatrixAction
             }
 
             // 3. Mark Product as has_variants and synchronize single source of truth stock
+            $totalStock = (int) $product->variants()->sum('stock');
             $product->update([
                 'has_variants' => true,
-                'stock' => (int) $product->variants()->sum('stock'),
+                'stock' => $totalStock,
             ]);
+
+            // Synchronize warehouse stock location to eliminate stock drift
+            $targetWarehouseId = $config['warehouse_id'] ?? Warehouse::orderBy('id')->value('id');
+            if ($targetWarehouseId) {
+                WarehouseStock::updateOrCreate(
+                    [
+                        'warehouse_id' => $targetWarehouseId,
+                        'product_id' => $product->id,
+                    ],
+                    [
+                        'stock_qty' => $totalStock,
+                    ]
+                );
+            }
 
             AuditLog::create([
                 'staff_id' => $operatorId,
