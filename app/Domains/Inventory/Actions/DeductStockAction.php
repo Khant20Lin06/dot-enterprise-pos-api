@@ -13,7 +13,7 @@ class DeductStockAction
      *
      * @throws InsufficientStockException
      */
-    public function execute(int $productId, int $qty, ?int $productOptionId = null): Product
+    public function execute(int $productId, int $qty, ?int $productOptionId = null, ?int $warehouseId = null): Product
     {
         // 1. Lock Product Row for Update
         $product = Product::where('id', $productId)->lockForUpdate()->firstOrFail();
@@ -51,7 +51,27 @@ class DeductStockAction
             }
         }
 
-        // 5. Broadcast Real-Time Reverb WebSocket Event
+        // 5. If specific physical Warehouse location provided, lock and deduct warehouse stock
+        if ($warehouseId) {
+            $whStock = \App\Domains\Inventory\Models\WarehouseStock::where('warehouse_id', $warehouseId)
+                ->where('product_id', $productId)
+                ->when($productOptionId, fn ($q) => $q->where('product_option_id', $productOptionId))
+                ->lockForUpdate()
+                ->first();
+
+            if ($whStock) {
+                if ($whStock->stock_qty < $qty) {
+                    $wh = \App\Domains\Inventory\Models\Warehouse::find($warehouseId);
+                    $whName = $wh ? $wh->name : "Warehouse #{$warehouseId}";
+                    throw new InsufficientStockException(
+                        "{$whName} has insufficient stock for '{$product->name}'. Available: {$whStock->stock_qty}, Requested: {$qty}."
+                    );
+                }
+                $whStock->decrement('stock_qty', $qty);
+            }
+        }
+
+        // 6. Broadcast Real-Time Reverb WebSocket Event
         event(new \App\Domains\Inventory\Events\StockUpdatedEvent($freshProduct, -$qty, 'SALE'));
 
         return $freshProduct;

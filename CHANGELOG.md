@@ -8,6 +8,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Phase C Implementation: Multi-Warehouse & Multi-Branch Engine:**
+  - **Database Migrations (`warehouses`, `warehouse_stocks`, `stock_transfers`, `stock_transfer_items`):**
+    - `warehouses`: Physical branch locations, distribution hubs, workshop bays with central flags.
+    - `warehouse_stocks`: Physical inventory ledger tracking stock per warehouse, aisle/bin location, and min alert levels.
+    - `stock_transfers` & `stock_transfer_items`: Relational two-step transfer orders with audit trails.
+  - **Domain Models & Relationships (`Warehouse`, `WarehouseStock`, `StockTransfer`, `StockTransferItem`):** Fully typed Eloquent models with relations to `Product`, `ProductOption`, `StaffUser`.
+  - **Domain Actions:**
+    - `CreateWarehouseAction` & `UpdateWarehouseAction`: Location management with central warehouse uniqueness.
+    - `CreateStockTransferAction`: Inter-branch transfer drafting with atomic sequential sequence generation (`TRF-20261030-0001`).
+    - `DispatchStockTransferAction`: Verifies source warehouse stock with pessimistic row locking (`lockForUpdate()`), decrements physical stock, transitions status to `In Transit`, and broadcasts `StockTransferDispatchedEvent`.
+    - `ReceiveStockTransferAction`: Restocks destination warehouse inventory with pessimistic row locking, transitions status to `Received`, and broadcasts `StockTransferReceivedEvent`.
+    - `CancelStockTransferAction`: Transfer cancellation with automatic inventory revert for in-transit shipments.
+  - **Enhanced Core Inventory Actions:**
+    - `DeductStockAction`: Enhanced with optional `$warehouseId`, locking and validating location-specific `warehouse_stocks` before decrementing.
+    - `ReplenishStockAction`: Enhanced with optional `$warehouseId`, incrementing location-specific `warehouse_stocks`.
+  - **API Layer:**
+    - FormRequests: `CreateWarehouseRequest`, `UpdateWarehouseRequest`, `CreateStockTransferRequest`, `ReceiveStockTransferRequest`.
+    - JsonResources: `WarehouseResource`, `WarehouseStockResource`, `StockTransferResource`.
+    - RESTful Controllers: `WarehouseController` (5 routes) and `StockTransferController` (6 routes) with RBAC permission enforcement.
+  - **Automated Feature Test Suite (`tests/Feature/MultiWarehouseEngineTest.php`):**
+    - 7 comprehensive tests covering warehouse creation, location stock independence, two-step transfer dispatch & receive, insufficient stock prevention, same-warehouse transfer blocking, in-transit cancellation revert, and low-stock queries.
+    - Total test suite status: **66 passed (313 assertions) — 100% pass rate in 3.77s**.
+
 - **Phase B Implementation: Roles & Staff Management CRUD API:**
   - **Permission Catalog Service (`PermissionCatalogService`):** Exposes canonical system permissions catalog matching Next.js UI structure (`pos`, `inventory`, `workshop`, `finances`, `purchases`, `settings`) with human labels (EN & MM), icons, and danger flags.
   - **Redis Permission Caching (`StaffUser::hasPermission`):** Optimized authorization checks using `Cache::remember("role:perms:{$roleId}")` to eliminate redundant database JSON column parsing on high-traffic API requests.

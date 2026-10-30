@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\SalesReturnController;
 use App\Http\Controllers\Api\V1\StaffUserController;
+use App\Http\Controllers\Api\V1\StockTransferController;
+use App\Http\Controllers\Api\V1\WarehouseController;
 use App\Http\Controllers\Api\V1\WorkOrderController;
 use Illuminate\Support\Facades\Route;
 
@@ -113,6 +115,31 @@ Route::prefix('v1')->group(function () {
                 ->middleware('permission:settings,manageRoles');
             Route::delete('/{id}', [StaffUserController::class, 'destroy'])
                 ->middleware('permission:settings,manageRoles');
+        });
+
+        // Warehouses & Physical Branches
+        Route::prefix('warehouses')->group(function () {
+            Route::get('/', [WarehouseController::class, 'index']);
+            Route::post('/', [WarehouseController::class, 'store'])
+                ->middleware('permission:inventory,create');
+            Route::get('/{id}', [WarehouseController::class, 'show']);
+            Route::put('/{id}', [WarehouseController::class, 'update'])
+                ->middleware('permission:inventory,edit');
+            Route::get('/{id}/stocks', [WarehouseController::class, 'stocks']);
+        });
+
+        // Stock Transfers (Two-step Dispatch & Receive)
+        Route::prefix('stock-transfers')->group(function () {
+            Route::get('/', [StockTransferController::class, 'index']);
+            Route::post('/', [StockTransferController::class, 'store'])
+                ->middleware('permission:inventory,adjustStock');
+            Route::get('/{id}', [StockTransferController::class, 'show']);
+            Route::post('/{id}/dispatch', [StockTransferController::class, 'dispatchTransfer'])
+                ->middleware('permission:inventory,adjustStock');
+            Route::post('/{id}/receive', [StockTransferController::class, 'receiveTransfer'])
+                ->middleware('permission:inventory,adjustStock');
+            Route::post('/{id}/cancel', [StockTransferController::class, 'cancelTransfer'])
+                ->middleware('permission:inventory,adjustStock');
         });
     });
 });

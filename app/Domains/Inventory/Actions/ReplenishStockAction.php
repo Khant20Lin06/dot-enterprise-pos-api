@@ -10,7 +10,7 @@ class ReplenishStockAction
     /**
      * Increase inventory upon purchasing or return restocking.
      */
-    public function execute(int $productId, int $qty, ?int $productOptionId = null): Product
+    public function execute(int $productId, int $qty, ?int $productOptionId = null, ?int $warehouseId = null): Product
     {
         $product = Product::where('id', $productId)->lockForUpdate()->firstOrFail();
 
@@ -30,6 +30,22 @@ class ReplenishStockAction
             if ($option) {
                 $option->increment('stock', $qty);
             }
+        }
+
+        // If specific warehouse provided, increment warehouse stock
+        if ($warehouseId) {
+            $whStock = \App\Domains\Inventory\Models\WarehouseStock::firstOrCreate(
+                [
+                    'warehouse_id' => $warehouseId,
+                    'product_id' => $productId,
+                    'product_option_id' => $productOptionId,
+                ],
+                ['stock_qty' => 0]
+            );
+
+            \App\Domains\Inventory\Models\WarehouseStock::where('id', $whStock->id)
+                ->lockForUpdate()
+                ->increment('stock_qty', $qty);
         }
 
         // Broadcast Real-Time Reverb WebSocket Event

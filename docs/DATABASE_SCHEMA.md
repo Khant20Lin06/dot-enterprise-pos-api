@@ -173,6 +173,52 @@ erDiagram
   * `staff_id` (BIGINT, FK -> `staff_users.id`)
   * `created_at` (TIMESTAMP)
 
+* **`warehouses`** (Physical Branch Locations & Central Warehouses)
+  * `id` (BIGINT, PK, AUTO_INCREMENT)
+  * `code` (VARCHAR(50), UNIQUE, INDEX) — e.g. "WH-MAIN-01", "BR-HLEDAN-02"
+  * `name` (VARCHAR(150))
+  * `type` (VARCHAR(50), DEFAULT 'Branch Counter')
+  * `address` (TEXT, NULLABLE)
+  * `phone` (VARCHAR(50), NULLABLE)
+  * `is_central` (BOOLEAN, DEFAULT FALSE)
+  * `is_active` (BOOLEAN, DEFAULT TRUE)
+  * `created_at`, `updated_at` (TIMESTAMP)
+
+* **`warehouse_stocks`** (Physical Inventory Balances per Location)
+  * `id` (BIGINT, PK, AUTO_INCREMENT)
+  * `warehouse_id` (BIGINT, FK -> `warehouses.id`, ON DELETE CASCADE)
+  * `product_id` (BIGINT, FK -> `products.id`, ON DELETE CASCADE)
+  * `product_option_id` (BIGINT, NULLABLE, FK -> `product_options.id`, ON DELETE CASCADE)
+  * `stock_qty` (INT, DEFAULT 0, INDEX)
+  * `min_alert_qty` (INT, DEFAULT 5)
+  * `bin_location` (VARCHAR(100), NULLABLE)
+  * `created_at`, `updated_at` (TIMESTAMP)
+
+* **`stock_transfers`** (Two-Step Inter-Branch Transfer Orders)
+  * `id` (BIGINT, PK, AUTO_INCREMENT)
+  * `transfer_no` (VARCHAR(50), UNIQUE, INDEX) — e.g. "TRF-20261030-0001"
+  * `source_warehouse_id` (BIGINT, FK -> `warehouses.id`)
+  * `destination_warehouse_id` (BIGINT, FK -> `warehouses.id`)
+  * `requested_by` (BIGINT, FK -> `staff_users.id`)
+  * `approved_by` (BIGINT, NULLABLE, FK -> `staff_users.id`)
+  * `received_by` (BIGINT, NULLABLE, FK -> `staff_users.id`)
+  * `status` (ENUM('Draft', 'In Transit', 'Received', 'Cancelled'), DEFAULT 'Draft', INDEX)
+  * `notes` (TEXT, NULLABLE)
+  * `dispatched_at` (TIMESTAMP, NULLABLE)
+  * `received_at` (TIMESTAMP, NULLABLE)
+  * `created_at`, `updated_at` (TIMESTAMP)
+
+* **`stock_transfer_items`** (Transfer Line Items)
+  * `id` (BIGINT, PK, AUTO_INCREMENT)
+  * `stock_transfer_id` (BIGINT, FK -> `stock_transfers.id`, ON DELETE CASCADE)
+  * `product_id` (BIGINT, FK -> `products.id`)
+  * `product_option_id` (BIGINT, NULLABLE, FK -> `product_options.id`)
+  * `qty_requested` (INT)
+  * `qty_dispatched` (INT, DEFAULT 0)
+  * `qty_received` (INT, DEFAULT 0)
+  * `notes` (VARCHAR(255), NULLABLE)
+  * `created_at`, `updated_at` (TIMESTAMP)
+
 ---
 
 ### 2.4. Workshop, Work Orders & Mechanics

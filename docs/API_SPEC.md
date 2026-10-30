@@ -428,3 +428,68 @@
 * **Endpoint:** `DELETE /staff/{id}`
 * **Authorization:** `Bearer <token>` (`settings.manageRoles`)
 * **Note:** Self-deletion by the authenticated user is strictly blocked.
+
+---
+
+## 8. Multi-Warehouse & Branches API
+
+### 8.1. List Warehouses
+* **Endpoint:** `GET /warehouses?active=1`
+* **Response (200 OK):** List of physical warehouses and branch counters with stock SKU totals.
+
+### 8.2. Create Warehouse
+* **Endpoint:** `POST /warehouses`
+* **Authorization:** `Bearer <token>` (`inventory.create`)
+* **Request Body:**
+```json
+{
+  "code": "WH-MDY-01",
+  "name": "Mandalay Central Distribution Hub",
+  "type": "Central Warehouse",
+  "address": "78th Street, Between 30th & 31st, Mandalay",
+  "phone": "0945001122",
+  "is_central": false,
+  "is_active": true
+}
+```
+
+### 8.3. Query Warehouse Physical Stocks & Low Stock Alerts
+* **Endpoint:** `GET /warehouses/{id}/stocks?low_stock=1`
+* **Response (200 OK):** Itemized stocks within this specific warehouse including aisle/bin location and alert threshold indicators.
+
+---
+
+## 9. Inter-Branch Stock Transfers API
+
+### 9.1. Create Draft Transfer
+* **Endpoint:** `POST /stock-transfers`
+* **Authorization:** `Bearer <token>` (`inventory.adjustStock`)
+* **Request Body:**
+```json
+{
+  "source_warehouse_id": 1,
+  "destination_warehouse_id": 2,
+  "notes": "Weekly replenishment for Hledan counter",
+  "items": [
+    {
+      "product_id": 101,
+      "qty": 20
+    }
+  ]
+}
+```
+
+### 9.2. Dispatch Transfer (Deduct Source Stock, Mark In-Transit)
+* **Endpoint:** `POST /stock-transfers/{id}/dispatch`
+* **Authorization:** `Bearer <token>` (`inventory.adjustStock`)
+* **Effect:** Verifies physical source warehouse stock with pessimistic locking, decrements stock, transitions status to `In Transit`, and broadcasts `StockTransferDispatchedEvent`.
+
+### 9.3. Receive Transfer (Increment Destination Stock)
+* **Endpoint:** `POST /stock-transfers/{id}/receive`
+* **Authorization:** `Bearer <token>` (`inventory.adjustStock`)
+* **Effect:** Increments destination warehouse stock with pessimistic locking, marks status `Received`, and broadcasts `StockTransferReceivedEvent`.
+
+### 9.4. Cancel Transfer
+* **Endpoint:** `POST /stock-transfers/{id}/cancel`
+* **Authorization:** `Bearer <token>` (`inventory.adjustStock`)
+* **Effect:** Cancels draft, or if in-transit, automatically reverts dispatched goods back to the source warehouse.

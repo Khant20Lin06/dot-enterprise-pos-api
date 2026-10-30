@@ -96,6 +96,11 @@ class Product extends Model
         return $this->hasMany(StockAdjustment::class, 'product_id');
     }
 
+    public function warehouseStocks(): HasMany
+    {
+        return $this->hasMany(WarehouseStock::class, 'product_id');
+    }
+
     public function isLowStock(): bool
     {
         return !$this->is_labor && $this->stock <= $this->min_stock;
