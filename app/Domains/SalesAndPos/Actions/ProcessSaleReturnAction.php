@@ -170,11 +170,15 @@ class ProcessSaleReturnAction
             $status = $allRestocked ? 'Restocked' : 'Completed';
 
             // 8. Create Master Sales Return Record
+            $activeSession = \App\Domains\SalesAndPos\Models\PosSession::where('cashier_id', $cashierId)->where('status', 'open')->first();
+            $sessionId = $data['pos_session_id'] ?? $activeSession?->id;
+
             $salesReturn = SalesReturn::create([
                 'return_no' => $returnNo,
                 'sales_order_id' => $salesOrder->id,
                 'customer_id' => $salesOrder->customer_id,
                 'cashier_id' => $cashierId,
+                'pos_session_id' => $sessionId,
                 'total_refund_amount' => $totalRefundAmount,
                 'refund_method' => $refundMethod,
                 'refund_reference' => $refundReference,

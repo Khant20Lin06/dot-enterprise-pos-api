@@ -3,7 +3,9 @@
 use App\Http\Controllers\Api\V1\AttributeController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CustomerCreditController;
+use App\Http\Controllers\Api\V1\PaymentGatewayController;
 use App\Http\Controllers\Api\V1\PosController;
+use App\Http\Controllers\Api\V1\PosSessionController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\RoleController;
@@ -69,6 +71,24 @@ Route::prefix('v1')->group(function () {
             Route::get('/held-orders', [PosController::class, 'listHeldOrders']);
             Route::post('/held-orders', [PosController::class, 'parkOrder']);
             Route::delete('/held-orders/{id}', [PosController::class, 'deleteHeldOrder']);
+
+            // Cash Register Shifts (Sessions) & Blind Count Reconciliation
+            Route::prefix('sessions')->group(function () {
+                Route::get('/', [PosSessionController::class, 'index']);
+                Route::get('/current', [PosSessionController::class, 'current']);
+                Route::post('/open', [PosSessionController::class, 'open']);
+                Route::get('/{id}', [PosSessionController::class, 'show']);
+                Route::post('/{id}/close', [PosSessionController::class, 'close']);
+                Route::get('/{id}/x-report', [PosSessionController::class, 'xReport']);
+                Route::get('/{id}/z-report', [PosSessionController::class, 'zReport']);
+            });
+        });
+
+        // Payment Gateways & Dynamic QR
+        Route::prefix('payments')->group(function () {
+            Route::post('/generate-qr', [PaymentGatewayController::class, 'generateQr']);
+            Route::get('/transactions/{transactionNo}', [PaymentGatewayController::class, 'status']);
+            Route::post('/simulate-webhook', [PaymentGatewayController::class, 'simulateWebhook']);
         });
 
         // Sales Returns & Refunds

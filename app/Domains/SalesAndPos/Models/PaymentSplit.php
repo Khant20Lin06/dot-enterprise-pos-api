@@ -11,11 +11,15 @@ class PaymentSplit extends Model
         'sales_order_id',
         'method',
         'amount',
+        'status',
+        'gateway_provider',
         'reference_no',
+        'gateway_payload',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'gateway_payload' => 'array',
     ];
 
     public function salesOrder(): BelongsTo

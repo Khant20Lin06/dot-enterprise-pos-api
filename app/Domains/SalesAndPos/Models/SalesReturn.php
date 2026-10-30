@@ -15,6 +15,7 @@ class SalesReturn extends Model
         'sales_order_id',
         'customer_id',
         'cashier_id',
+        'pos_session_id',
         'total_refund_amount',
         'refund_method',
         'refund_reference',
@@ -42,6 +43,11 @@ class SalesReturn extends Model
     public function cashier(): BelongsTo
     {
         return $this->belongsTo(StaffUser::class, 'cashier_id');
+    }
+
+    public function posSession(): BelongsTo
+    {
+        return $this->belongsTo(PosSession::class, 'pos_session_id');
     }
 
     public function items(): HasMany

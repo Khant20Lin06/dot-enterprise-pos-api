@@ -8,6 +8,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Phase E Implementation: Payment Gateways, Cashier Shifts & Cash Reconciliation:**
+  - **Database Migration (`2026_10_30_000012_create_pos_sessions_and_payment_gateways_tables.php`):**
+    - `pos_sessions`: Cash register shift sessions tracking cashier, physical terminal, opening float, timestamps, counted cash, calculated expected cash, variance, and breakdown by payment tender.
+    - `payment_transactions`: Gateway intents tracking provider (`kbzpay`, `wavepay`), QR payload, status lifecycle (`pending`, `successful`, `failed`), and external gateway references.
+    - Linked `pos_session_id` to `sales_orders` and `sales_returns`.
+    - Enhanced `payment_splits` with `status`, `gateway_provider`, and `gateway_payload`.
+  - **Domain Models & Relationships (`PosSession`, `PaymentTransaction`):**
+    - `PosSession`: Relations to `StaffUser`, `Warehouse`, `SalesOrder`, `SalesReturn`, and `PaymentTransaction`.
+    - `PaymentTransaction`: Relations to `PosSession` and `SalesOrder`.
+  - **Payment Gateway Driver Pattern:**
+    - `PaymentGatewayDriverInterface`: Standardized contract for QR generation, webhook verification, status queries, and refunds.
+    - `KbzPayGatewayDriver`: Myanmar MMQR EMV specification generator and KBZPay deeplink intents.
+    - `WavePayGatewayDriver`: Wave Money merchant QR and deeplink generator.
+    - `PaymentGatewayManager`: Resolves gateway drivers dynamically.
+  - **Domain Actions:**
+    - `OpenPosSessionAction`: Enforces single-active-session invariant per cashier and per terminal using row-level locking; generates atomic sequential session numbers (`SHIFT-YYYYMMDD-0001`).
+    - `ClosePosSessionAction`: Performs blind cash count reconciliation, calculates expected cash via drawer formula (`expected = opening_float + cash_sales - cash_refunds`), flags cash variance (`Over` / `Short`), and writes audit trail.
+    - `GenerateShiftAuditReportAction`: Real-time compilation of interim **X-Report** (during shift) and final **Z-Report** (upon close) with tender breakdowns and reconciliation statistics.
+    - `CreatePaymentTransactionAction`: Creates dynamic QR payment intents for customer terminals.
+  - **Real-Time WebSockets (Laravel Reverb):**
+    - `PosSessionOpenedEvent`: Broadcasts on `pos.sessions` channel upon shift start.
+    - `PosSessionClosedEvent`: Broadcasts on `pos.sessions` channel upon shift close.
+  - **API Layer:**
+    - FormRequests: `OpenPosSessionRequest`, `ClosePosSessionRequest`, `GeneratePaymentQrRequest`, `SimulatePaymentWebhookRequest`.
+    - JsonResources: `PosSessionResource`, `PaymentTransactionResource`.
+    - RESTful Controllers:
+      - `PosSessionController`: `GET /pos/sessions`, `GET /pos/sessions/current`, `POST /pos/sessions/open`, `GET /pos/sessions/{id}`, `POST /pos/sessions/{id}/close`, `GET /pos/sessions/{id}/x-report`, `GET /pos/sessions/{id}/z-report`.
+      - `PaymentGatewayController`: `POST /payments/generate-qr`, `GET /payments/transactions/{no}`, `POST /payments/simulate-webhook`.
+  - **Pest Automated Feature Test Suite (`tests/Feature/PosSessionAndPaymentReconciliationTest.php`):**
+    - 9 comprehensive tests verifying shift open, duplicate prevention, current shift lookup, automatic order session linkage, X-report generation, blind count cash shortage variance, balanced Z-report, MMQR generation, and webhook transitions.
+    - Total test suite status: **81 passed (414 assertions) — 100% pass rate in 4.20s**.
 - **Phase D Implementation: Product Variants (Size & Color EAV Matrix):**
   - **Database Migration (`2026_10_30_000011_create_product_attributes_and_variants_tables.php`):**
     - `attributes`: Master attributes catalog (`id`, `code`, `name`, `description`).

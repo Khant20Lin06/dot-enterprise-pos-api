@@ -25,6 +25,7 @@
 | **Phase B** | Roles & Staff Management CRUD API (RoleController, StaffController, Redis Cache) | 🟢 Completed | 100% |
 | **Phase C** | Multi-Warehouse & Multi-Branch Engine (Warehouses, Two-Step Transfers, Location Stocks) | 🟢 Completed | 100% |
 | **Phase D** | Product Variants: Size & Color EAV Matrix (Attributes Master, Cartesian Matrix, Barcode Resolution) | 🟢 Completed | 100% |
+| **Phase E** | Payment Gateways, Cashier Shifts & Reconciliation (Shift Open/Close, Blind Count, MMQR, X/Z-Reports) | 🟢 Completed | 100% |
 
 ---
 
@@ -159,4 +160,33 @@
   - `ProductController` variant extensions: `GET /api/v1/products/{id}/variants`, `POST /api/v1/products/{id}/variants/matrix`, `GET /api/v1/products/barcode/{barcode}`.
 - [x] Pest Feature Test Suite:
   - `tests/Feature/ProductVariantMatrixTest.php`: 6 passed (51 assertions).
-  - Full Test Suite: **72 passed (364 assertions) — 100% pass rate in 4.50s**.
+  - Full Test Suite at Phase D: **72 passed (364 assertions)**.
+
+---
+
+### Phase E: Payment Gateways, Cashier Shifts & Cash Reconciliation
+- [x] Schema Migration: `2026_10_30_000012_create_pos_sessions_and_payment_gateways_tables.php`
+  - Created `pos_sessions` table (`session_no`, `cashier_id`, `terminal_id`, `warehouse_id`, `opening_float`, `status`, `opened_at`, `closed_at`, `counted_cash`, `expected_cash`, `cash_variance`, tender totals).
+  - Created `payment_transactions` table (`transaction_no`, `pos_session_id`, `sales_order_id`, `provider`, `amount`, `currency`, `qr_payload`, `status`, `gateway_ref`).
+  - Added `pos_session_id` foreign key to `sales_orders` and `sales_returns`.
+  - Added `status`, `gateway_provider`, `gateway_payload` to `payment_splits`.
+- [x] Payment Gateway Driver Pattern & Contracts:
+  - `PaymentGatewayDriverInterface`: contracts for QR generation, webhook verification, status queries, and refunds.
+  - `KbzPayGatewayDriver`: MMQR EMV standard specification and KBZPay deeplink generator.
+  - `WavePayGatewayDriver`: Wave Money deeplink and QR intent generator.
+  - `PaymentGatewayManager`: driver resolution by provider slug.
+- [x] Domain Business Actions & Hardened Logic:
+  - `OpenPosSessionAction`: Enforces single-active-session invariant per cashier and per terminal with pessimistic row locking; generates atomic sequential session numbers (`SHIFT-YYYYMMDD-0001`).
+  - `ClosePosSessionAction`: Blind cash count drawer reconciliation. Computes `expected_cash = opening_float + cash_sales - cash_refunds` and detects cash variance (Over/Short) with automated audit log severity flags.
+  - `GenerateShiftAuditReportAction`: Real-time compilation of interim **X-Report** (during open shift) and final **Z-Report** (upon shift close) with tender breakdown and drawer variance audit.
+  - `CreatePaymentTransactionAction`: Asynchronous payment intent generation for customer display terminals.
+  - `ProcessCheckoutAction` & `ProcessSaleReturnAction`: Automatically associates transactions with active open cashier shift session.
+- [x] Real-Time WebSockets (Laravel Reverb):
+  - `PosSessionOpenedEvent`: Broadcasts on `pos.sessions` channel upon shift startup.
+  - `PosSessionClosedEvent`: Broadcasts on `pos.sessions` channel with Z-Report summary upon shift close.
+- [x] RESTful API Endpoints & Resources:
+  - `PosSessionController`: `GET /`, `GET /current`, `POST /open`, `GET /{id}`, `POST /{id}/close`, `GET /{id}/x-report`, `GET /{id}/z-report`.
+  - `PaymentGatewayController`: `POST /generate-qr`, `GET /transactions/{no}`, `POST /simulate-webhook`.
+- [x] Pest Feature Test Suite:
+  - `tests/Feature/PosSessionAndPaymentReconciliationTest.php`: 9 passed (50 assertions).
+  - Full Test Suite: **81 passed (414 assertions) — 100% pass rate in 4.20s**.

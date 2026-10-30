@@ -18,6 +18,7 @@ class SalesOrder extends Model
         'customer_id',
         'vehicle_id',
         'cashier_id',
+        'pos_session_id',
         'subtotal',
         'labor_total',
         'discount_amount',
@@ -57,6 +58,11 @@ class SalesOrder extends Model
     public function cashier(): BelongsTo
     {
         return $this->belongsTo(StaffUser::class, 'cashier_id');
+    }
+
+    public function posSession(): BelongsTo
+    {
+        return $this->belongsTo(PosSession::class, 'pos_session_id');
     }
 
     public function items(): HasMany

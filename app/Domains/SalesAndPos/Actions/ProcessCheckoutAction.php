@@ -159,12 +159,17 @@ class ProcessCheckoutAction
             // Hardening 4: Atomic Concurrency-Safe Invoice Sequencing (Zero Collision Risk)
             $orderNo = app(\App\Services\AtomicSequenceService::class)->getNextSequence('INV');
 
+            // Resolve active shift session for cashier if not explicitly supplied
+            $activeSession = \App\Domains\SalesAndPos\Models\PosSession::where('cashier_id', $cashierId)->where('status', 'open')->first();
+            $sessionId = $data['pos_session_id'] ?? $activeSession?->id;
+
             // 7. Create Master Sales Order Record
             $salesOrder = SalesOrder::create([
                 'order_no' => $orderNo,
                 'customer_id' => $customerId ?? 1,
                 'vehicle_id' => $data['vehicle_id'] ?? null,
                 'cashier_id' => $cashierId,
+                'pos_session_id' => $sessionId,
                 'subtotal' => $calculatedSubtotal,
                 'labor_total' => $laborTotal,
                 'discount_amount' => $discountTotal,
@@ -205,11 +210,23 @@ class ProcessCheckoutAction
 
             // 9. Record Payment Splits
             foreach ($paymentSplits as $split) {
+                $method = $split['method'] ?? 'Cash';
+                $gatewayProvider = $split['gateway_provider'] ?? match (strtolower($method)) {
+                    'kpay', 'kbzpay' => 'kbzpay',
+                    'wave', 'wavepay' => 'wavepay',
+                    'card', 'credit card' => 'card',
+                    'credit', 'due' => 'credit',
+                    default => 'cash',
+                };
+
                 PaymentSplit::create([
                     'sales_order_id' => $salesOrder->id,
-                    'method' => $split['method'] ?? 'Cash',
+                    'method' => $method,
                     'amount' => (float) ($split['amount'] ?? 0.00),
+                    'status' => $split['status'] ?? 'completed',
+                    'gateway_provider' => $gatewayProvider,
                     'reference_no' => $split['reference_no'] ?? null,
+                    'gateway_payload' => $split['gateway_payload'] ?? null,
                 ]);
             }
 

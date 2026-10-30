@@ -323,12 +323,30 @@ erDiagram
 ---
 
 ### 2.5. Sales, POS Orders & Multi-Tender Payments
+* **`pos_sessions`** (Cash Register Shift Sessions)
+  * `id` (BIGINT, PK, AUTO_INCREMENT)
+  * `session_no` (VARCHAR(50), UNIQUE, INDEX) — e.g. "SHIFT-20261030-0001"
+  * `cashier_id` (BIGINT, FK -> `staff_users.id`)
+  * `terminal_id` (VARCHAR(50), INDEX)
+  * `warehouse_id` (BIGINT, NULLABLE, FK -> `warehouses.id`)
+  * `opening_float` (DECIMAL(14,2), DEFAULT 0.00)
+  * `status` (ENUM('open', 'closed'), DEFAULT 'open', INDEX)
+  * `opened_at` (TIMESTAMP)
+  * `closed_at` (TIMESTAMP, NULLABLE)
+  * `counted_cash` (DECIMAL(14,2), NULLABLE) — Blind count on close
+  * `expected_cash` (DECIMAL(14,2), NULLABLE) — opening_float + cash_sales - cash_refunds
+  * `cash_variance` (DECIMAL(14,2), NULLABLE) — counted_cash - expected_cash (Over/Short)
+  * `total_sales`, `total_refunds`, `cash_sales`, `kpay_sales`, `wave_sales`, `card_sales`, `credit_sales` (DECIMAL(14,2))
+  * `opening_notes`, `closing_notes` (TEXT, NULLABLE)
+  * `created_at`, `updated_at` (TIMESTAMP)
+
 * **`sales_orders`** (Invoices)
   * `id` (BIGINT, PK, AUTO_INCREMENT)
   * `order_no` (VARCHAR(50), UNIQUE, INDEX) — e.g. "INV-20261030-001"
   * `customer_id` (BIGINT, FK -> `customers.id`)
   * `vehicle_id` (BIGINT, NULLABLE, FK -> `vehicles.id`)
   * `cashier_id` (BIGINT, FK -> `staff_users.id`)
+  * `pos_session_id` (BIGINT, NULLABLE, FK -> `pos_sessions.id`, ON DELETE SET NULL)
   * `subtotal` (DECIMAL(14,2))
   * `labor_total` (DECIMAL(14,2), DEFAULT 0.00)
   * `discount_amount` (DECIMAL(14,2), DEFAULT 0.00)
@@ -360,8 +378,27 @@ erDiagram
   * `sales_order_id` (BIGINT, FK -> `sales_orders.id`, ON DELETE CASCADE)
   * `method` (ENUM('Cash', 'KPay', 'WavePay', 'Card', 'Credit', 'Bank Transfer'))
   * `amount` (DECIMAL(14,2))
+  * `status` (VARCHAR(30), DEFAULT 'completed', INDEX) — 'pending', 'completed', 'failed', 'refunded'
+  * `gateway_provider` (VARCHAR(50), NULLABLE) — 'kbzpay', 'wavepay', 'cash', 'card'
   * `reference_no` (VARCHAR(100), NULLABLE) — e.g. KPay Transaction ID
+  * `gateway_payload` (JSON, NULLABLE)
   * `created_at` (TIMESTAMP)
+
+* **`payment_transactions`** (Dynamic QR & Webhook Lifecycle)
+  * `id` (BIGINT, PK, AUTO_INCREMENT)
+  * `transaction_no` (VARCHAR(60), UNIQUE, INDEX) — e.g. "TXN-20261030-0001"
+  * `pos_session_id` (BIGINT, NULLABLE, FK -> `pos_sessions.id`)
+  * `sales_order_id` (BIGINT, NULLABLE, FK -> `sales_orders.id`)
+  * `provider` (VARCHAR(50), INDEX) — 'kbzpay', 'wavepay', 'cbpay'
+  * `payment_method` (VARCHAR(50), DEFAULT 'QR')
+  * `amount` (DECIMAL(14,2))
+  * `currency` (VARCHAR(10), DEFAULT 'MMK')
+  * `qr_payload` (TEXT, NULLABLE) — MMQR string or deeplink
+  * `status` (VARCHAR(30), DEFAULT 'pending', INDEX) — 'pending', 'successful', 'failed', 'expired'
+  * `gateway_ref` (VARCHAR(100), NULLABLE, INDEX) — Prepay ID / External order ref
+  * `metadata` (JSON, NULLABLE)
+  * `expires_at` (TIMESTAMP, NULLABLE)
+  * `created_at`, `updated_at` (TIMESTAMP)
 
 * **`credit_settlements`**
   * `id` (BIGINT, PK, AUTO_INCREMENT)

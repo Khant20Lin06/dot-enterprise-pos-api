@@ -589,3 +589,148 @@
 * **Endpoint:** `POST /stock-transfers/{id}/cancel`
 * **Authorization:** `Bearer <token>` (`inventory.adjustStock`)
 * **Effect:** Cancels draft, or if in-transit, automatically reverts dispatched goods back to the source warehouse.
+
+---
+
+## 10. Cash Register Shifts & Cash Reconciliation API
+
+### 10.1. Open Shift Session
+* **Endpoint:** `POST /pos/sessions/open`
+* **Request Body:**
+```json
+{
+  "terminal_id": "COUNTER-01",
+  "opening_float": 100000.00,
+  "warehouse_id": 1,
+  "opening_notes": "Morning cashier shift"
+}
+```
+* **Response (201 Created):**
+```json
+{
+  "success": true,
+  "message": "Shift #SHIFT-20261030-0001 opened successfully.",
+  "data": {
+    "id": 1,
+    "sessionNo": "SHIFT-20261030-0001",
+    "terminalId": "COUNTER-01",
+    "openingFloat": 100000.00,
+    "status": "open",
+    "openedAt": "2026-10-30T08:00:00+07:00"
+  }
+}
+```
+
+### 10.2. Get Current Active Shift
+* **Endpoint:** `GET /pos/sessions/current`
+* **Response (200 OK):** Details of the currently open shift for the authenticated cashier/terminal.
+
+### 10.3. Interim X-Report (Mid-Shift Audit Reading)
+* **Endpoint:** `GET /pos/sessions/{id}/x-report`
+* **Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "reportType": "X-Report",
+    "isFinal": false,
+    "sessionNo": "SHIFT-20261030-0001",
+    "financialSummary": {
+      "openingFloat": 100000.00,
+      "ordersCount": 14,
+      "grossSales": 450000.00,
+      "returnsCount": 1,
+      "grossRefunds": 15000.00,
+      "netSales": 435000.00
+    },
+    "tenderBreakdown": {
+      "cash": { "sales": 250000.00, "refunds": 15000.00, "net": 235000.00 },
+      "kpay": 120000.00,
+      "wavepay": 50000.00,
+      "card": 30000.00,
+      "credit": 0.00
+    },
+    "cashReconciliation": {
+      "openingFloat": 100000.00,
+      "expectedDrawerCash": 335000.00,
+      "varianceStatus": "Active"
+    }
+  }
+}
+```
+
+### 10.4. Close Shift Session (Blind Cash Count)
+* **Endpoint:** `POST /pos/sessions/{id}/close`
+* **Request Body:**
+```json
+{
+  "counted_cash": 335000.00,
+  "closing_notes": "Balanced shift end"
+}
+```
+* **Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Shift #SHIFT-20261030-0001 closed successfully. Variance: 0.00 Ks.",
+  "data": {
+    "id": 1,
+    "status": "closed",
+    "expectedCash": 335000.00,
+    "countedCash": 335000.00,
+    "cashVariance": 0.00
+  }
+}
+```
+
+### 10.5. Final Z-Report (Shift Closing Audit)
+* **Endpoint:** `GET /pos/sessions/{id}/z-report`
+* **Response (200 OK):** Complete shift audit report with `isFinal: true` and `varianceStatus: "Balanced" / "Short" / "Over"`.
+
+---
+
+## 11. Payment Gateways & Dynamic QR API
+
+### 11.1. Generate Dynamic MMQR / Deeplink Payment Intent
+* **Endpoint:** `POST /payments/generate-qr`
+* **Request Body:**
+```json
+{
+  "provider": "kbzpay",
+  "amount": 58000.00,
+  "order_no": "INV-20261030-0001"
+}
+```
+* **Response (201 Created):**
+```json
+{
+  "success": true,
+  "data": {
+    "transactionNo": "TXN-20261030-0001",
+    "provider": "kbzpay",
+    "amount": 58000.00,
+    "qrPayload": "00020101021226500011com.kbzpay0115...",
+    "deeplink": "kbzpay://qr?prepay_id=KBZ-123&order_id=INV-20261030-0001",
+    "status": "pending",
+    "expiresAt": "2026-10-30T08:15:00+07:00"
+  }
+}
+```
+
+### 11.2. Query Payment Status
+* **Endpoint:** `GET /payments/transactions/{transactionNo}`
+* **Response (200 OK):** Transaction status (`pending`, `successful`, `failed`).
+
+### 11.3. Simulate / Receive Payment Webhook Callback
+* **Endpoint:** `POST /payments/simulate-webhook`
+* **Request Body:**
+```json
+{
+  "provider": "kbzpay",
+  "gateway_ref": "KBZ-123",
+  "status": "successful",
+  "amount": 58000.00,
+  "transaction_id": "KBZ-TXN-0099"
+}
+```
+* **Response (200 OK):** Transitions transaction to `successful` and confirms associated order payment split.
