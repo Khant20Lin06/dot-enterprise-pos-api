@@ -154,6 +154,9 @@ class ProcessCheckoutAction
             $loadedOrder = $salesOrder->load(['items.product', 'payments', 'customer', 'cashier']);
             event(new \App\Domains\SalesAndPos\Events\OrderCompletedEvent($loadedOrder));
 
+            // 11. Dispatch Queued Background Thermal Receipt Generation Job (Horizon/Redis)
+            \App\Jobs\GenerateReceiptPdfJob::dispatch($salesOrder->id);
+
             return $loadedOrder;
         });
     }

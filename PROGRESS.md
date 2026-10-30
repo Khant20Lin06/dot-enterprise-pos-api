@@ -88,18 +88,19 @@
 ---
 
 ### Phase 6: Redis Queues & Laravel Horizon
-- [ ] Setup Laravel Horizon dashboard (`/horizon`)
-- [ ] Create `GenerateReceiptPdfJob` (Queued background PDF generation)
-- [ ] Create `SendDailySalesSummaryJob`
-- [ ] Implement failed job retry mechanisms and backoff strategies
+- [x] Setup Laravel Horizon dashboard (`/horizon`) & multi-queue supervisors (`receipts`, `reports`, `notifications`, `default`)
+- [x] Create `GenerateReceiptPdfJob` (Queued background thermal slip/PDF generation)
+- [x] Create `SendDailySalesSummaryJob` (Daily executive sales and workshop reports)
+- [x] Implement failed job retry mechanisms and backoff strategies (`$tries = 3`, `$backoff`, `failed()` audit alerts)
+- [x] Authored and passed comprehensive feature test suite: `tests/Feature/QueuedJobsTest.php` (100% pass)
 
 ---
 
 ### Phase 7: Node.js Microservice Async Worker Bridge
-- [ ] Create lightweight Node.js worker service under `services/node-worker/`
-- [ ] Implement high-speed Barcode/QR generation (`bwip-js`)
-- [ ] Implement ESC/POS binary slip formatting
-- [ ] Connect Laravel to Node.js via Redis Pub/Sub
+- [x] Lightweight Node.js worker service under `services/node-worker/`
+- [x] Implement high-speed Barcode/QR generation (`bwip-js`)
+- [x] Implement ESC/POS binary slip formatting
+- [x] Connect Laravel to Node.js via Redis Pub/Sub (`pos:print-job`, `pos:barcode-gen`) & HTTP Bridge (`NodeWorkerBridgeService.php`)
 
 ---
 

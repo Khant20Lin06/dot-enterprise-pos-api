@@ -69,6 +69,11 @@ class SalesOrder extends Model
         return $this->hasMany(PaymentSplit::class, 'sales_order_id');
     }
 
+    public function paymentSplits(): HasMany
+    {
+        return $this->hasMany(PaymentSplit::class, 'sales_order_id');
+    }
+
     public function workOrder(): HasOne
     {
         return $this->hasOne(WorkOrder::class, 'sales_order_id');

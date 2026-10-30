@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Phase 6 & Phase 7 Implementation (Redis Queues, Horizon & Node.js Worker Bridge):**
+  - Integrated **Laravel Horizon** for queue monitoring with multi-queue supervisors handling `receipts`, `reports`, `notifications`, and `default`.
+  - Configured Horizon authorization gate for administrative roles and system engineers.
+  - Implemented Queued Background Jobs:
+    - `GenerateReceiptPdfJob`: Asynchronous thermal receipt formatting, file artifact generation (`storage/app/receipts`), and audit logging.
+    - `SendDailySalesSummaryJob`: High-performance daily sales and workshop report compilation (`storage/app/reports`), financial reconciliation across POS, customer debt recovery, and mechanic commissions.
+    - `DispatchThermalPrintJob`: Redis Pub/Sub dispatcher to node printer workers.
+  - Configured resilient retry policies: `$tries = 3`, exponential `$backoff`, and critical failure alerting in `audit_logs`.
+  - Implemented `NodeWorkerBridgeService`: Seamless bridge to Node.js microservice (`bwip-js` barcode/QR generation, ESC/POS byte commands, Redis Pub/Sub `pos:print-job`, and offline fallback).
+  - Pest Feature test suite: `tests/Feature/QueuedJobsTest.php` with 6 comprehensive tests (100% pass).
+
 - **Phase 5 Implementation:**
   - Integrated **Laravel Reverb** high-performance WebSocket server for real-time multi-counter syncing on port 8080.
   - Published and tuned Reverb & Broadcasting configurations (`config/reverb.php`, `config/broadcasting.php`).
