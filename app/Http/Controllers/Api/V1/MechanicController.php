@@ -102,6 +102,13 @@ class MechanicController extends Controller
             ], 422);
         }
 
+        if ($mechanic->commissions()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete mechanic '{$mechanic->name}'. Historical commission and payroll records exist. Retain record for accounting and tax audit integrity.",
+            ], 422);
+        }
+
         $mechanic->delete();
 
         return response()->json([

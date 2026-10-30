@@ -18,6 +18,7 @@ class CreateSalesReturnRequest extends FormRequest
             'reason' => ['required', 'string', 'max:255'],
             'refund_method' => ['required', 'string', 'in:Cash,Credit Note,KBZPay,WavePay,Card Reversal,Credit Adjusted,Bank Transfer,cash,credit_note,credit_adjusted'],
             'refund_reference' => ['nullable', 'string', 'max:100'],
+            'idempotency_key' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.sales_order_item_id' => ['required', 'integer', 'exists:sales_order_items,id'],

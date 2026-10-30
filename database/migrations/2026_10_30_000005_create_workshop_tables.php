@@ -75,7 +75,7 @@ return new class extends Migration
         // 5. Mechanic Commissions Ledger
         Schema::create('mechanic_commissions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('mechanic_id')->constrained('mechanics')->onDelete('cascade');
+            $table->foreignId('mechanic_id')->constrained('mechanics')->onDelete('restrict');
             $table->foreignId('work_order_id')->constrained('work_orders')->onDelete('cascade');
             $table->decimal('labor_amount', 14, 2);
             $table->decimal('commission_rate', 5, 2); // e.g. 20.00%

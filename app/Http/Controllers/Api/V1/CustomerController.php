@@ -109,6 +109,20 @@ class CustomerController extends Controller
             ], 422);
         }
 
+        if ($customer->creditSettlements()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete customer #{$id}. Historical credit debt settlement receipts exist. Retain for financial ledger integrity.",
+            ], 422);
+        }
+
+        if ($customer->salesReturns()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete customer #{$id}. Historical sales return and refund records exist.",
+            ], 422);
+        }
+
         $customer->delete();
 
         return response()->json([

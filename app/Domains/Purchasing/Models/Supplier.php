@@ -35,4 +35,9 @@ class Supplier extends Model
     {
         return $this->hasMany(OutsourcedPart::class, 'supplier_id');
     }
+
+    public function purchaseReturns(): HasMany
+    {
+        return $this->hasMany(PurchaseReturn::class, 'supplier_id');
+    }
 }

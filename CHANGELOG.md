@@ -8,6 +8,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Stage 4: Anti-Destruction & Accounting Safeguards (Forensic Hotfixes):**
+  - **Mechanic Commission Payroll Ledger Protection:**
+    - Migration schema fix (`database/migrations/2026_10_30_000005_create_workshop_tables.php`) changing `mechanic_commissions.mechanic_id` foreign key from `onDelete('cascade')` to `onDelete('restrict')`.
+    - Added pre-flight relational guard in `MechanicController::destroy` returning `422 Unprocessable Entity` when commissions exist, preventing irreversible payroll audit destruction.
+  - **Comprehensive Product Deletion Relational Guards:**
+    - Added Eloquent relationships on `Product`: `purchaseItems()`, `purchaseReturns()`, `stockTransferItems()`.
+    - Hardened `ProductController::destroy` to check `salesOrderItems`, `workOrderItems`, `purchaseItems`, `purchaseReturns`, `stockAdjustments`, `stockTransferItems`, and positive physical stock (`stock > 0`), returning structured `422 Unprocessable Entity` and eliminating unhandled 500 SQL Integrity Constraint errors.
+  - **Supplier Deletion Relational Guards:**
+    - Added `purchaseReturns()` relationship on `Supplier`.
+    - Hardened `SupplierController::destroy` to check `purchases`, `outsourcedParts`, `purchaseReturns`, and outstanding AP balance (`outstanding_balance > 0`), returning `422 Unprocessable Entity`.
+  - **Customer Deletion Relational Guards:**
+    - Hardened `CustomerController::destroy` to check `salesOrders`, `vehicles`, `creditSettlements`, and `salesReturns`, preserving payment ledgers and customer audit trails.
+  - **Warehouse-Level Negative Stock Invariant:**
+    - Hardened `StockAdjustmentController::store` with pessimistic row locking (`lockForUpdate()`) on `WarehouseStock`, evaluating `$currentWhQty + $adjustedQty < 0` and throwing `DomainException` (returning `422 Unprocessable Entity`), preventing negative warehouse inventory drift.
+  - **Outsourced Workshop Parts Safeguards:**
+    - Hardened `OutsourcedPartController::destroy` to block deletion when parent Work Order is `Completed / Invoiced` or `QC & Ready`, or when part status is `Received & Fitted`, preventing margin loss and unbilled vehicle parts.
+  - **Sales Return Idempotency & Duplicate Refund Protection:**
+    - Created migration `database/migrations/2026_10_30_000016_stage4_anti_destruction_and_accounting_safeguards.php` adding indexed `idempotency_key` column to `sales_returns`.
+    - Updated `CreateSalesReturnRequest`, `SalesReturn` model, and `SalesReturnResource`.
+    - Hardened `ProcessSaleReturnAction` with duplicate idempotency key detection returning existing return records early.
+    - Updated `SalesReturnController::store` to return `200 OK` on duplicate idempotent requests vs `201 Created` on new requests, eliminating double refunds and restock duplication.
+  - **Automated Pest Feature Test Suite:**
+    - Authored `tests/Feature/Phase8AntiDestructionAndAccountingSafeguardsTest.php` with 7 comprehensive feature tests.
+    - Updated `MasterDataCrudTest` and `Phase3OrphanModelsActivationTest` to align with physical stock and fitted part delete guards.
+    - Repository Test Suite: **159 passed (906 assertions) — 100% pass rate in 11.56s**.
 - **OWASP Top 10 API Security (2023) & ASVS Standards Implementation:**
   - **EnforceSecurityHeaders Middleware (OWASP ASVS 14.4 & API8):**
     - Enforces `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection: 0`, `Referrer-Policy: strict-origin-when-cross-origin`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; sandbox`, hardware-restricting `Permissions-Policy`, and financial/PII `Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private`.

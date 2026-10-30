@@ -101,6 +101,27 @@ class SupplierController extends Controller
             ], 422);
         }
 
+        if ($supplier->outsourcedParts()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete supplier '{$supplier->name}'. Outsourced workshop machining records exist.",
+            ], 422);
+        }
+
+        if ($supplier->purchaseReturns()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete supplier '{$supplier->name}'. Return-to-vendor (RTV) debit notes exist.",
+            ], 422);
+        }
+
+        if ((float) $supplier->outstanding_balance > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete supplier '{$supplier->name}' with outstanding accounts payable balance ({$supplier->outstanding_balance} Ks). Settle balance before deletion.",
+            ], 422);
+        }
+
         $supplier->delete();
 
         return response()->json([

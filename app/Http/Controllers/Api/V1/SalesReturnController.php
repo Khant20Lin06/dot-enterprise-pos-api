@@ -22,11 +22,15 @@ class SalesReturnController extends Controller
 
         $salesReturn = $action->execute($request->validated(), $cashierId);
 
+        $statusCode = $salesReturn->wasRecentlyCreated ? 201 : 200;
+
         return response()->json([
             'success' => true,
-            'message' => "Sales Return #{$salesReturn->return_no} processed successfully.",
+            'message' => $salesReturn->wasRecentlyCreated
+                ? "Sales Return #{$salesReturn->return_no} processed successfully."
+                : "Sales Return #{$salesReturn->return_no} retrieved (idempotent duplicate request).",
             'data' => new SalesReturnResource($salesReturn),
-        ], 201);
+        ], $statusCode);
     }
 
     /**

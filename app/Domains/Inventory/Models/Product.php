@@ -118,6 +118,21 @@ class Product extends Model
         return $this->hasMany(ProductVehicleFitment::class, 'product_id');
     }
 
+    public function purchaseItems(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Purchasing\Models\PurchaseItem::class, 'product_id');
+    }
+
+    public function purchaseReturns(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Purchasing\Models\PurchaseReturn::class, 'product_id');
+    }
+
+    public function stockTransferItems(): HasMany
+    {
+        return $this->hasMany(StockTransferItem::class, 'product_id');
+    }
+
     public function isLowStock(): bool
     {
         return !$this->is_labor && $this->stock <= $this->min_stock;

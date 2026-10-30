@@ -250,7 +250,11 @@ it('creates product via API, allocates warehouse stock automatically, updates pr
             ],
         ]);
 
-    // 3. Delete Product (unreferenced)
+    // 3. Delete Product (unreferenced, clear physical stock first)
+    $product->update(['stock' => 0]);
+    if ($warehouse) {
+        WarehouseStock::where('warehouse_id', $warehouse->id)->where('product_id', $productId)->update(['stock_qty' => 0]);
+    }
     $deleteResponse = $this->deleteJson("/api/v1/products/{$productId}");
     $deleteResponse->assertStatus(200)
         ->assertJson(['success' => true]);

@@ -34,6 +34,7 @@ class SalesReturnResource extends JsonResource
             'refundReference' => $this->refund_reference,
             'reason' => $this->reason,
             'status' => $this->status,
+            'idempotencyKey' => $this->idempotency_key,
             'pointsDeducted' => (int) $this->points_deducted,
             'notes' => $this->notes,
             'items' => $this->items->map(function ($item) {

@@ -23,6 +23,7 @@ class SalesReturn extends Model
         'status',
         'notes',
         'points_deducted',
+        'idempotency_key',
     ];
 
     protected $casts = [

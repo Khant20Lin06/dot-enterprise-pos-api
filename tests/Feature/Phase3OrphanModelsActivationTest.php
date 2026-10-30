@@ -222,7 +222,11 @@ it('manages outsourced workshop third-party parts and machining orders', functio
         ->assertJsonPath('data.status', 'Received & Fitted')
         ->assertJsonPath('data.paymentStatus', 'Paid');
 
-    // 3. Delete
+    // 3. Delete (revert to ordered before deletion to pass accounting safeguards)
+    $this->putJson("/api/v1/workshop/outsourced-parts/{$partId}", [
+        'status' => 'Ordered',
+        'payment_status' => 'Unpaid',
+    ]);
     $deleteResponse = $this->deleteJson("/api/v1/workshop/outsourced-parts/{$partId}");
     $deleteResponse->assertStatus(200);
 });

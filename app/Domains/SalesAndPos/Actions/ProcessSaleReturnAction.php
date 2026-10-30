@@ -32,6 +32,17 @@ class ProcessSaleReturnAction
      */
     public function execute(array $data, int $cashierId): SalesReturn
     {
+        // 1. Idempotency Check (Prevent duplicate refund charges and restock loops)
+        if (! empty($data['idempotency_key'])) {
+            $existing = SalesReturn::where('idempotency_key', $data['idempotency_key'])
+                ->with(['items.product', 'salesOrder', 'customer', 'cashier'])
+                ->first();
+
+            if ($existing) {
+                return $existing;
+            }
+        }
+
         return DB::transaction(function () use ($data, $cashierId) {
             $salesOrderId = (int) ($data['sales_order_id'] ?? 0);
             $itemsData = $data['items'] ?? [];
@@ -219,6 +230,7 @@ class ProcessSaleReturnAction
                 'status' => $status,
                 'notes' => $notes,
                 'points_deducted' => $pointsToDeduct,
+                'idempotency_key' => $data['idempotency_key'] ?? null,
             ]);
 
             // 9. Create Return Items
@@ -256,9 +268,10 @@ class ProcessSaleReturnAction
             ]);
 
             // 12. Broadcast Real-Time Event
-            event(new SalesReturnProcessedEvent($salesReturn->load(['items.product', 'salesOrder', 'customer', 'cashier'])));
+            $salesReturn->load(['items.product', 'salesOrder', 'customer', 'cashier']);
+            event(new SalesReturnProcessedEvent($salesReturn));
 
-            return $salesReturn->fresh(['items.product', 'salesOrder', 'customer', 'cashier']);
+            return $salesReturn;
         });
     }
 }

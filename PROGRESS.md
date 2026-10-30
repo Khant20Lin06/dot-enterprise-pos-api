@@ -36,6 +36,7 @@
 | **Phase M** | Forensic Remediation Stage 2: Concurrency, Deadlocks & Inventory Integrity Hardening | 🟢 Completed | 100% |
 | **Phase N** | Forensic Remediation Stage 3: Operational CRUD Completeness & Missing Enterprise Features | 🟢 Completed | 100% |
 | **Phase O** | OWASP Top 10 API Security & ASVS Standard Implementation (Headers, XSS Disarm, Progressive Lockout, Error Sanitization) | 🟢 Completed | 100% |
+| **Phase P** | Stage 4: Anti-Destruction & Accounting Safeguards (Cascade Delete Prevention, Master Relational Guards, WH Stock Invariant, Sales Return Idempotency) | 🟢 Completed | 100% |
 
 ---
 
@@ -472,3 +473,29 @@
 - [x] **Pest Feature Test Suite:**
   - `tests/Feature/Phase7OwaspSecurityStandardTest.php`: 6 passed (61 assertions).
   - Full Test Suite: **152 passed (874 assertions) — 100% pass rate in 10.68s**.
+
+---
+
+### Phase P: Forensic Remediation Stage 4: Anti-Destruction & Accounting Safeguards
+- [x] **Cascade Deletion Elimination on Mechanic Payroll Ledgers:**
+  - Updated `database/migrations/2026_10_30_000005_create_workshop_tables.php` modifying `mechanic_commissions.mechanic_id` foreign key from `onDelete('cascade')` to `onDelete('restrict')`.
+  - Added application-level pre-flight guard in `MechanicController::destroy` rejecting deletion with `422 Unprocessable Entity` if commission history exists.
+- [x] **Product Relational Deletion Guards:**
+  - Added missing Eloquent relationships on `Product`: `purchaseItems()`, `purchaseReturns()`, `stockTransferItems()`.
+  - Updated `ProductController::destroy` guarding against `salesOrderItems`, `workOrderItems`, `purchaseItems`, `purchaseReturns`, `stockAdjustments`, `stockTransferItems`, and positive physical stock (`stock > 0`), returning `422 Unprocessable Entity` and eliminating unhandled 500 SQL Integrity Constraint errors.
+- [x] **Supplier Relational Deletion Guards:**
+  - Added `purchaseReturns()` relationship on `Supplier`.
+  - Updated `SupplierController::destroy` checking `purchases`, `outsourcedParts`, `purchaseReturns`, and outstanding AP debt (`outstanding_balance > 0`), preventing orphaned vendor records and SQL 500 errors.
+- [x] **Customer Relational Deletion Guards:**
+  - Updated `CustomerController::destroy` checking `salesOrders`, `vehicles`, `creditSettlements`, and `salesReturns`, safeguarding historical payment receipts and audit ledgers.
+- [x] **Warehouse-Level Negative Stock Invariant:**
+  - Hardened `StockAdjustmentController::store` with pessimistic row locking (`lockForUpdate()`) on `WarehouseStock`, verifying `$currentWhQty + $adjustedQty >= 0` and rejecting negative warehouse drift with `422 Unprocessable Entity`.
+- [x] **Outsourced Workshop Parts Safeguards:**
+  - Hardened `OutsourcedPartController::destroy` to strictly block deletion if parent Work Order is `Completed / Invoiced` or `QC & Ready`, or if part status is `Received & Fitted`, preventing margin loss and unbilled vehicle parts.
+- [x] **Sales Return Idempotency & Re-entrancy Protection:**
+  - Added migration `2026_10_30_000016_stage4_anti_destruction_and_accounting_safeguards.php` creating indexed `idempotency_key` on `sales_returns`.
+  - Updated `CreateSalesReturnRequest`, `SalesReturn` model, and `SalesReturnResource`.
+  - Implemented duplicate replay detection in `ProcessSaleReturnAction` returning the existing return record early, and configured `SalesReturnController::store` to return `200 OK` on duplicate requests vs `201 Created` on new requests, preventing double cash refunds and duplicate restock.
+- [x] **Pest Feature Test Suite:**
+  - `tests/Feature/Phase8AntiDestructionAndAccountingSafeguardsTest.php`: 7 passed (32 assertions).
+  - Full Test Suite: **159 passed (906 assertions) — 100% pass rate in 11.56s**.

@@ -85,11 +85,26 @@ class OutsourcedPartController extends Controller
     }
 
     /**
-     * Delete an outsourced part record.
+     * Delete an outsourced part record (guarded against invoiced job cards and fitted parts).
      */
     public function destroy(int $id): JsonResponse
     {
-        $part = OutsourcedPart::findOrFail($id);
+        $part = OutsourcedPart::with('workOrder')->findOrFail($id);
+
+        if ($part->workOrder && in_array($part->workOrder->status, ['Completed / Invoiced', 'QC & Ready'])) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete outsourced part '{$part->part_name}' because Work Order #{$part->workOrder->job_card_no} has reached '{$part->workOrder->status}'. Billing and cost integrity must be preserved.",
+            ], 422);
+        }
+
+        if ($part->status === 'Received & Fitted') {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete outsourced part '{$part->part_name}' because it has already been received and fitted to the vehicle.",
+            ], 422);
+        }
+
         $part->delete();
 
         return response()->json([

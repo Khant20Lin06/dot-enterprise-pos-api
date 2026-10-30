@@ -74,15 +74,22 @@ class StockAdjustmentController extends Controller
                         ->lockForUpdate()
                         ->first();
 
+                    $currentWhQty = $whStock ? (int) $whStock->stock_qty : 0;
+                    $projectedWhQty = $currentWhQty + $adjustedQty;
+
+                    if ($projectedWhQty < 0) {
+                        throw new \DomainException("Negative warehouse stock violation: Warehouse '{$targetWarehouse->name}' currently has {$currentWhQty} units of '{$product->name}'. Cannot adjust by {$adjustedQty} units.");
+                    }
+
                     if (! $whStock) {
                         WarehouseStock::create([
                             'warehouse_id' => $targetWarehouse->id,
                             'product_id' => $product->id,
                             'product_option_id' => null,
-                            'stock_qty' => max(0, $adjustedQty),
+                            'stock_qty' => $projectedWhQty,
                         ]);
                     } else {
-                        $whStock->increment('stock_qty', $adjustedQty);
+                        $whStock->update(['stock_qty' => $projectedWhQty]);
                     }
                 }
 

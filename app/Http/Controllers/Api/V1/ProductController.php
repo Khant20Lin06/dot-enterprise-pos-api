@@ -161,6 +161,41 @@ class ProductController extends Controller
             ], 422);
         }
 
+        if ($product->purchaseItems()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete product '{$product->name}' (#{$id}). Historical purchase orders exist. Retain record for procurement audit integrity.",
+            ], 422);
+        }
+
+        if ($product->purchaseReturns()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete product '{$product->name}' (#{$id}). Return-to-vendor (RTV) debit notes exist.",
+            ], 422);
+        }
+
+        if ($product->stockAdjustments()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete product '{$product->name}' (#{$id}). Inventory stock audit vouchers exist.",
+            ], 422);
+        }
+
+        if ($product->stockTransferItems()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete product '{$product->name}' (#{$id}). Inter-warehouse stock transfer records exist.",
+            ], 422);
+        }
+
+        if ((int) $product->stock > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete product '{$product->name}' (#{$id}) because it has physical stock ({$product->stock} units). Adjust stock to zero before deleting.",
+            ], 422);
+        }
+
         $product->delete();
 
         return response()->json([

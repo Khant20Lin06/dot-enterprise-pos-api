@@ -585,6 +585,7 @@
   "reason": "Customer bought wrong viscosity oil",
   "refund_method": "Cash",
   "refund_reference": "REF-VOUCHER-001",
+  "idempotency_key": "c4b3f81e-11a2-4d89-9a7f-7128e404b931",
   "notes": "Original bottle seal intact, verified sellable",
   "items": [
     {
@@ -595,7 +596,7 @@
   ]
 }
 ```
-* **Success Response (201 Created):**
+* **Success Response (201 Created on new return, 200 OK on duplicate idempotent replay):**
 ```json
 {
   "success": true,
@@ -1450,3 +1451,31 @@ All unhandled exceptions and HTTP error conditions return standardized JSON payl
 * **405 Method Not Allowed:** `{"success": false, "message": "HTTP method not allowed for this endpoint.", "error_code": "METHOD_NOT_ALLOWED"}`
 * **429 Rate Limit Exceeded:** `{"success": false, "message": "Too many requests. Rate limit exceeded.", "error_code": "RATE_LIMIT_EXCEEDED"}`
 * **500 Internal Error:** Suppresses database connection credentials, SQL query strings, and file paths.
+
+---
+
+## 15. Stage 4: Anti-Destruction & Accounting Safeguards
+
+### 15.1. Master Record Relational Delete Guards (422 Unprocessable Entity)
+To eliminate catastrophic unhandled 500 SQL Integrity Constraint errors and preserve irreversible audit trails, all master record deletions undergo strict pre-flight validation:
+
+| Resource | Protected Endpoints | Blocking Criteria |
+| :--- | :--- | :--- |
+| **Mechanics** | `DELETE /workshop/mechanics/{id}` | Historical commission records exist (`mechanic_commissions`). Rejects with 422 to preserve permanent payroll auditability. |
+| **Products** | `DELETE /products/{id}` | Referenced in `sales_order_items`, `work_order_items`, `purchase_items`, `purchase_returns`, `stock_adjustments`, `stock_transfer_items`, OR has positive physical stock (`stock > 0`). |
+| **Suppliers** | `DELETE /suppliers/{id}` | Referenced in `purchases`, `outsourced_parts`, `purchase_returns`, OR has outstanding AP debt (`outstanding_balance > 0`). |
+| **Customers** | `DELETE /customers/{id}` | Referenced in `sales_orders`, `vehicles`, `credit_settlements`, OR `sales_returns`. |
+| **Outsourced Parts** | `DELETE /workshop/outsourced-parts/{id}` | Parent Work Order status is `Completed / Invoiced` or `QC & Ready`, OR part status is `Received & Fitted`. |
+
+### 15.2. Warehouse-Level Negative Stock Invariant
+* **Endpoint:** `POST /stock-adjustments`
+* **Invariant:** In multi-warehouse operations, a product's stock within the specified warehouse cannot become negative (`WarehouseStock.stock_qty + adjusted_qty >= 0`).
+* **Behavior:** Row lock (`lockForUpdate()`) is acquired on the target `warehouse_stocks` record. If the resulting balance would drop below 0, a `422 Unprocessable Entity` is returned with an explicit error message, preventing branch-level phantom inventory.
+
+### 15.3. Sales Return Idempotency & Duplicate Replay Protection
+* **Endpoint:** `POST /sales-returns`
+* **Mechanism:** Accepts client-generated `idempotency_key` (UUID/string).
+* **Behavior:** If a request with an existing `idempotency_key` is submitted:
+  * Restocking, customer points deduction, and credit adjustment are **BYPASSED**.
+  * The existing `SalesReturn` record is returned immediately with HTTP `200 OK` (compared to `201 Created` for fresh returns).
+  * Eliminates duplicate cash refund payouts and duplicate inventory restocking caused by network retransmissions or cashier double-clicks.
