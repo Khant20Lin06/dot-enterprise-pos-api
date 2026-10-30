@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Enterprise Forensic Module Gap Audit (`docs/ENTERPRISE_MODULES_GAP_AUDIT.md`):**
+  - Completed brutal, zero-sugarcoating comparative audit of Companion Frontend (`dot-pos-next`) and Backend API (`laravel-pos-api`).
+  - Uncovered 5 Critical Architectural Gaps:
+    1. **Sales Return Module:** 100% missing on backend (Zero migrations, models, actions, or routes).
+    2. **Product Variants (Size/Color):** Flat 1D option string schema, lacking 2D Matrix EAV attributes, resulting in double-stock desync hazards.
+    3. **Payment Gateways & Shift Reconciliation:** Passive string records without state machines, dynamic QR, or cash drawer session tracking.
+    4. **Multi-Warehouse / Multi-Branch:** Monolithic single-store schema (`products.stock`), lacking `warehouses`, `warehouse_stocks`, and `stock_transfers`.
+    5. **Role & Permission (RBAC) CRUD:** Static database seeder trap without RESTful `RoleController` or `StaffUserController` endpoints.
+  - Published comprehensive 16-module CRUD gap inventory and 5-phase master remediation roadmap.
+
 - **Enterprise Red-Team Security & Concurrency Hardening:**
   - **Deadlock Elimination (Consistent Lock Acquisition Order):** Enforced ascending `product_id` sorting in `ProcessCheckoutAction` before row-level locking, preventing dining-philosophers deadlock across concurrent checkout stations.
   - **Atomic Concurrency-Safe Sequencing (`AtomicSequenceService`):** Created `system_sequences` table with pessimistic locking and Redis `INCR` fallback, replacing un-safe `SalesOrder::count() + 1` and preventing duplicate invoice collisions.
