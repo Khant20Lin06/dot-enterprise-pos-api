@@ -32,6 +32,7 @@ class DeductStockAction
 
         // 3. Deduct Master Stock
         $product->decrement('stock', $qty);
+        $freshProduct = $product->fresh();
 
         // 4. If Variant Option provided, lock and deduct variant stock as well
         if ($productOptionId) {
@@ -50,6 +51,9 @@ class DeductStockAction
             }
         }
 
-        return $product->fresh();
+        // 5. Broadcast Real-Time Reverb WebSocket Event
+        event(new \App\Domains\Inventory\Events\StockUpdatedEvent($freshProduct, -$qty, 'SALE'));
+
+        return $freshProduct;
     }
 }

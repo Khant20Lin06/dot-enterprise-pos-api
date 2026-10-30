@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Phase 5 Implementation:**
+  - Integrated **Laravel Reverb** high-performance WebSocket server for real-time multi-counter syncing on port 8080.
+  - Published and tuned Reverb & Broadcasting configurations (`config/reverb.php`, `config/broadcasting.php`).
+  - Implemented Domain Broadcast Events with `ShouldBroadcast`:
+    - `StockUpdatedEvent`: Multi-counter live inventory synchronization across POS cashier terminals and workshop dispatch bays (`stock.channel`).
+    - `OrderCompletedEvent`: Live multi-device sales sync with financial totals, split tenders, and counter station isolation (`pos.orders`, `pos.counter.{counterId}`).
+    - `WorkOrderStatusChangedEvent`: Live workshop status updates for technicians, service advisors, and display screens (`workshop.bay`).
+  - Bound real-time broadcasting seamlessly into Domain Actions (`DeductStockAction`, `ReplenishStockAction`, `ProcessCheckoutAction`, `ConvertWorkOrderToInvoiceAction`).
+  - Added Pest Feature tests (`tests/Feature/ReverbBroadcastingTest.php`) verifying event payload structure, channel authorization, and domain action triggering (100% pass).
+
 - **Phase 4 Implementation:**
   - `DeductStockAction` & `ReplenishStockAction`: Concurrency control with Pessimistic Row Locking (`lockForUpdate()`), preventing overselling and supporting variant option stock.
   - `ProcessCheckoutAction`: ACID transaction orchestration, multi-tender payment splits (Cash, KPay, Card, Credit), credit debt accounting, loyalty points accrual, and idempotency key safeguard.

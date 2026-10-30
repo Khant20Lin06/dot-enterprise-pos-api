@@ -150,7 +150,11 @@ class ProcessCheckoutAction
                 ]);
             }
 
-            return $salesOrder->load(['items.product', 'payments', 'customer']);
+            // 10. Broadcast Real-Time Reverb WebSocket Event
+            $loadedOrder = $salesOrder->load(['items.product', 'payments', 'customer', 'cashier']);
+            event(new \App\Domains\SalesAndPos\Events\OrderCompletedEvent($loadedOrder));
+
+            return $loadedOrder;
         });
     }
 }

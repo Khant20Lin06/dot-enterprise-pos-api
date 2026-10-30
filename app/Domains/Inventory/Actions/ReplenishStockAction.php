@@ -19,6 +19,7 @@ class ReplenishStockAction
         }
 
         $product->increment('stock', $qty);
+        $freshProduct = $product->fresh();
 
         if ($productOptionId) {
             $option = ProductOption::where('id', $productOptionId)
@@ -31,6 +32,9 @@ class ReplenishStockAction
             }
         }
 
-        return $product->fresh();
+        // Broadcast Real-Time Reverb WebSocket Event
+        event(new \App\Domains\Inventory\Events\StockUpdatedEvent($freshProduct, +$qty, 'REPLENISH'));
+
+        return $freshProduct;
     }
 }

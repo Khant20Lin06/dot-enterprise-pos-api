@@ -127,9 +127,16 @@ class ConvertWorkOrderToInvoiceAction
                 'sales_order_id' => $salesOrder->id,
             ]);
 
+            $freshWorkOrder = $workOrder->fresh(['items', 'vehicle', 'customer', 'mechanic']);
+            $freshSalesOrder = $salesOrder->fresh(['items', 'payments', 'customer', 'cashier']);
+
+            // 10. Broadcast Real-Time Reverb WebSocket Events
+            event(new \App\Domains\Workshop\Events\WorkOrderStatusChangedEvent($freshWorkOrder, 'In Progress'));
+            event(new \App\Domains\SalesAndPos\Events\OrderCompletedEvent($freshSalesOrder));
+
             return [
-                'work_order' => $workOrder->fresh(['items', 'vehicle', 'customer']),
-                'sales_order' => $salesOrder->fresh(['items', 'payments']),
+                'work_order' => $freshWorkOrder,
+                'sales_order' => $freshSalesOrder,
                 'commission' => $commission,
             ];
         });
