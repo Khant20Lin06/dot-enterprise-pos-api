@@ -19,6 +19,7 @@ class CreateStockTransferRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.product_variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
             'items.*.product_option_id' => ['nullable', 'integer', 'exists:product_options,id'],
             'items.*.qty' => ['required', 'integer', 'min:1'],
             'items.*.notes' => ['nullable', 'string', 'max:255'],

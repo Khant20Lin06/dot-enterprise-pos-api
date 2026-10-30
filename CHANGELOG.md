@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Stage 5: CRUD Matrix Completion & Variant Alignment (Forensic Remediation):**
+  - **Attributes & AttributeValues Full CRUD:**
+    - `AttributeController`: Added `update` (`PUT /attributes/{id}`) and `destroy` (`DELETE /attributes/{id}`) with relational guards blocking deletion when values are actively mapped to product variants (`422 Unprocessable Entity`).
+    - `AttributeValueController`: Implemented dedicated standalone endpoints (`index`, `store`, `show`, `update`, `destroy`) under `/attributes/{attributeId}/values` with variant in-use delete guards.
+  - **Product Vehicle Fitment & Packaging UOM Conversion Updates:**
+    - `VehicleFitmentController`: Added `update` (`PUT /products/{id}/fitments/{fitmentId}`) for dynamic make, model, year range, and fitment notes updating.
+    - `ProductUomConversionController`: Added `update` (`PUT /products/{id}/uom-conversions/{conversionId}`) supporting conversion factor, barcode, cost price, and bulk sell price modifications.
+  - **Purchase Return Lifecycle & State Machine Transitions:**
+    - Created `TransitionPurchaseReturnStatusAction` and `UpdatePurchaseReturnStatusRequest`.
+    - Added `updateStatus` endpoints on `PATCH /purchases/returns/{id}/status` and `PUT /purchases/returns/{id}`.
+    - Supports full state machine: `Claimed -> Dispatched -> Credited` (settlement), `Replaced` (vendor replacement restocks product inventory and restores supplier AP balance), and `Cancelled` (reverses debit note, restocks inventory, and re-credits supplier).
+  - **StockTransfer & StockTransferItem Product Variant Alignment:**
+    - Migration `database/migrations/2026_10_30_000017_stage5_stock_transfer_variant_alignment.php` adding nullable `product_variant_id` on `stock_transfer_items`.
+    - Updated `StockTransferItem` model and `CreateStockTransferRequest`.
+    - Hardened `CreateStockTransferAction`, `DispatchStockTransferAction` (deducts variant inventory under pessimistic lock), `ReceiveStockTransferAction` (increments variant inventory at destination), and `CancelStockTransferAction` (reverts variant inventory).
+    - Updated `StockTransferResource` exposing `productVariantId`, `variantSku`, and `variantBarcode`.
+  - **Automated Pest Feature Test Suite:**
+    - Authored `tests/Feature/Phase9CrudMatrixAndVariantAlignmentTest.php` with 6 comprehensive feature tests.
+    - Repository Test Suite: **165 passed (941 assertions) — 100% pass rate in 11.78s**.
 - **Stage 4: Anti-Destruction & Accounting Safeguards (Forensic Hotfixes):**
   - **Mechanic Commission Payroll Ledger Protection:**
     - Migration schema fix (`database/migrations/2026_10_30_000005_create_workshop_tables.php`) changing `mechanic_commissions.mechanic_id` foreign key from `onDelete('cascade')` to `onDelete('restrict')`.

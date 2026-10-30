@@ -4,6 +4,7 @@ namespace App\Domains\Inventory\Actions;
 
 use App\Domains\Inventory\Events\StockTransferReceivedEvent;
 use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\ProductVariant;
 use App\Domains\Inventory\Models\StockAdjustment;
 use App\Domains\Inventory\Models\StockTransfer;
 use App\Domains\Inventory\Models\WarehouseStock;
@@ -59,6 +60,13 @@ class ReceiveStockTransferAction
                 WarehouseStock::where('id', $whStock->id)
                     ->lockForUpdate()
                     ->increment('stock_qty', $qtyToReceive);
+
+                if ($item->product_variant_id) {
+                    $variant = ProductVariant::where('id', $item->product_variant_id)->lockForUpdate()->first();
+                    if ($variant) {
+                        $variant->increment('stock', $qtyToReceive);
+                    }
+                }
 
                 $item->update(['qty_received' => $qtyToReceive]);
 

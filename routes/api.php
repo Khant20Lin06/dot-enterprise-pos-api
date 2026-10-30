@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AttributeController;
+use App\Http\Controllers\Api\V1\AttributeValueController;
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CategoryController;
@@ -95,6 +96,8 @@ Route::prefix('v1')->group(function () {
                 ->middleware('permission:inventory,view');
             Route::post('/{id}/uom-conversions', [ProductUomConversionController::class, 'store'])
                 ->middleware('permission:inventory,create');
+            Route::put('/{id}/uom-conversions/{conversionId}', [ProductUomConversionController::class, 'update'])
+                ->middleware('permission:inventory,edit');
             Route::delete('/{id}/uom-conversions/{conversionId}', [ProductUomConversionController::class, 'destroy'])
                 ->middleware('permission:inventory,edit');
 
@@ -103,6 +106,8 @@ Route::prefix('v1')->group(function () {
                 ->middleware('permission:inventory,view');
             Route::post('/{id}/fitments', [VehicleFitmentController::class, 'store'])
                 ->middleware('permission:inventory,create');
+            Route::put('/{id}/fitments/{fitmentId}', [VehicleFitmentController::class, 'update'])
+                ->middleware('permission:inventory,edit');
             Route::delete('/{id}/fitments/{fitmentId}', [VehicleFitmentController::class, 'destroy'])
                 ->middleware('permission:inventory,edit');
         });
@@ -143,6 +148,22 @@ Route::prefix('v1')->group(function () {
                 ->middleware('permission:inventory,create');
             Route::get('/{id}', [AttributeController::class, 'show'])
                 ->middleware('permission:inventory,view');
+            Route::put('/{id}', [AttributeController::class, 'update'])
+                ->middleware('permission:inventory,edit');
+            Route::delete('/{id}', [AttributeController::class, 'destroy'])
+                ->middleware('permission:inventory,edit');
+
+            // Attribute Values CRUD
+            Route::get('/{attributeId}/values', [AttributeValueController::class, 'index'])
+                ->middleware('permission:inventory,view');
+            Route::post('/{attributeId}/values', [AttributeValueController::class, 'store'])
+                ->middleware('permission:inventory,create');
+            Route::get('/{attributeId}/values/{valueId}', [AttributeValueController::class, 'show'])
+                ->middleware('permission:inventory,view');
+            Route::put('/{attributeId}/values/{valueId}', [AttributeValueController::class, 'update'])
+                ->middleware('permission:inventory,edit');
+            Route::delete('/{attributeId}/values/{valueId}', [AttributeValueController::class, 'destroy'])
+                ->middleware('permission:inventory,edit');
         });
 
         // POS Operations & Orders (Hardened with RBAC Permissions & Rate Limiting)
@@ -408,6 +429,10 @@ Route::prefix('v1')->group(function () {
                     ->middleware(['throttle:60,1', 'permission:purchases,create']);
                 Route::get('/{id}', [PurchaseReturnController::class, 'show'])
                     ->middleware('permission:purchases,view');
+                Route::patch('/{id}/status', [PurchaseReturnController::class, 'updateStatus'])
+                    ->middleware(['throttle:60,1', 'permission:purchases,edit']);
+                Route::put('/{id}', [PurchaseReturnController::class, 'updateStatus'])
+                    ->middleware(['throttle:60,1', 'permission:purchases,edit']);
             });
         });
 

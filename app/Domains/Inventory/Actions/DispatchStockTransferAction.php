@@ -4,6 +4,7 @@ namespace App\Domains\Inventory\Actions;
 
 use App\Domains\Inventory\Events\StockTransferDispatchedEvent;
 use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\ProductVariant;
 use App\Domains\Inventory\Models\StockTransfer;
 use App\Domains\Inventory\Models\WarehouseStock;
 use App\Domains\SecurityAndAudit\Models\AuditLog;
@@ -57,6 +58,19 @@ class DispatchStockTransferAction
                 }
 
                 $whStock->decrement('stock_qty', $item->qty_requested);
+
+                if ($item->product_variant_id) {
+                    $variant = ProductVariant::where('id', $item->product_variant_id)->lockForUpdate()->first();
+                    if ($variant) {
+                        if ($variant->stock < $item->qty_requested) {
+                            throw new InsufficientStockException(
+                                "Source Warehouse has insufficient variant stock for SKU '{$variant->sku}'. Available: {$variant->stock}, Requested: {$item->qty_requested}."
+                            );
+                        }
+                        $variant->decrement('stock', $item->qty_requested);
+                    }
+                }
+
                 $item->update(['qty_dispatched' => $item->qty_requested]);
             }
 

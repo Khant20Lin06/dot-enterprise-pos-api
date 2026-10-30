@@ -37,6 +37,7 @@
 | **Phase N** | Forensic Remediation Stage 3: Operational CRUD Completeness & Missing Enterprise Features | 🟢 Completed | 100% |
 | **Phase O** | OWASP Top 10 API Security & ASVS Standard Implementation (Headers, XSS Disarm, Progressive Lockout, Error Sanitization) | 🟢 Completed | 100% |
 | **Phase P** | Stage 4: Anti-Destruction & Accounting Safeguards (Cascade Delete Prevention, Master Relational Guards, WH Stock Invariant, Sales Return Idempotency) | 🟢 Completed | 100% |
+| **Phase Q** | Stage 5: CRUD Matrix Completion & Variant Alignment (Attributes, Values, Fitment, UOM, RTV Lifecycle, Stock Transfer Variants) | 🟢 Completed | 100% |
 
 ---
 
@@ -499,3 +500,26 @@
 - [x] **Pest Feature Test Suite:**
   - `tests/Feature/Phase8AntiDestructionAndAccountingSafeguardsTest.php`: 7 passed (32 assertions).
   - Full Test Suite: **159 passed (906 assertions) — 100% pass rate in 11.56s**.
+
+---
+
+### Phase Q: Forensic Remediation Stage 5: CRUD Matrix Completion & Variant Alignment
+- [x] **Variant Attributes & Values Full CRUD (C1):**
+  - Updated `AttributeController` with `update` (`PUT /attributes/{id}`) and `destroy` (`DELETE /attributes/{id}`).
+  - Added relational delete guard blocking deletion when attribute values are assigned to active `ProductVariant` records (`422 Unprocessable Entity`).
+  - Implemented standalone `AttributeValueController` (`index`, `store`, `show`, `update`, `destroy`) under `/attributes/{attributeId}/values` with variant in-use delete guards.
+- [x] **Vehicle Fitment & Packaging UOM Conversion Updates (C2):**
+  - Created `UpdateVehicleFitmentRequest` and added `update` method to `VehicleFitmentController` (`PUT /products/{id}/fitments/{fitmentId}`) for dynamic model, year-range, and engine compatibility updates.
+  - Created `UpdateProductUomConversionRequest` and added `update` method to `ProductUomConversionController` (`PUT /products/{id}/uom-conversions/{conversionId}`) for barcode, conversion factor, and bulk sell price modifications.
+- [x] **Purchase Return Lifecycle & Status Transitions (C3):**
+  - Created `UpdatePurchaseReturnStatusRequest` and domain action `TransitionPurchaseReturnStatusAction`.
+  - Implemented state machine transitions: `Claimed -> Dispatched -> Credited` (final settlement), `Replaced` (vendor replacement restocks product inventory and restores supplier AP debt), and `Cancelled` (reverses RTV, restocks inventory, and re-credits supplier).
+  - Exposed via `PATCH /purchases/returns/{id}/status` and `PUT /purchases/returns/{id}` with terminal state guards.
+- [x] **Stock Transfer Variant Alignment (C4):**
+  - Added migration `2026_10_30_000017_stage5_stock_transfer_variant_alignment.php` introducing nullable `product_variant_id` on `stock_transfer_items`.
+  - Updated `StockTransferItem` model with `product_variant_id` and `productVariant()` relationship.
+  - Updated `CreateStockTransferAction`, `DispatchStockTransferAction` (deducts variant stock), `ReceiveStockTransferAction` (increments variant stock), and `CancelStockTransferAction` (reverts variant stock).
+  - Updated `StockTransferResource` exposing `productVariantId`, `variantSku`, and `variantBarcode`.
+- [x] **Pest Feature Test Suite:**
+  - Authored `tests/Feature/Phase9CrudMatrixAndVariantAlignmentTest.php`: 6 passed (62 assertions).
+  - Full Test Suite: **165 passed (941 assertions) — 100% pass rate in 11.78s**.

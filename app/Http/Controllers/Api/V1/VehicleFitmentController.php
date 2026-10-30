@@ -9,6 +9,7 @@ use App\Domains\Inventory\Models\ProductVehicleFitment;
 use App\Domains\Workshop\Models\Vehicle;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\AttachVehicleFitmentRequest;
+use App\Http\Requests\V1\UpdateVehicleFitmentRequest;
 use App\Http\Resources\V1\ProductResource;
 use App\Http\Resources\V1\ProductVehicleFitmentResource;
 use Illuminate\Http\JsonResponse;
@@ -47,6 +48,27 @@ class VehicleFitmentController extends Controller
             'message' => 'Vehicle compatibility mapped successfully.',
             'data' => new ProductVehicleFitmentResource($fitment),
         ], 201);
+    }
+
+    /**
+     * Update an existing vehicle fitment mapping rule.
+     */
+    public function update(
+        int $productId,
+        int $fitmentId,
+        UpdateVehicleFitmentRequest $request
+    ): JsonResponse {
+        $fitment = ProductVehicleFitment::where('product_id', $productId)
+            ->where('id', $fitmentId)
+            ->firstOrFail();
+
+        $fitment->update($request->validated());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Vehicle compatibility mapping updated successfully.',
+            'data' => new ProductVehicleFitmentResource($fitment),
+        ]);
     }
 
     /**

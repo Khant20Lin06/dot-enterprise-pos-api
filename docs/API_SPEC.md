@@ -1479,3 +1479,63 @@ To eliminate catastrophic unhandled 500 SQL Integrity Constraint errors and pres
   * Restocking, customer points deduction, and credit adjustment are **BYPASSED**.
   * The existing `SalesReturn` record is returned immediately with HTTP `200 OK` (compared to `201 Created` for fresh returns).
   * Eliminates duplicate cash refund payouts and duplicate inventory restocking caused by network retransmissions or cashier double-clicks.
+
+---
+
+## 16. Stage 5: CRUD Matrix Completion & Variant Alignment
+
+### 16.1. Attributes & Attribute Values Standalone CRUD
+* **Permissions:** `inventory,view`, `inventory,create`, `inventory,edit`
+* **Update Attribute:** `PUT /attributes/{id}`
+  * Body: `{"name": "Exterior Paint Color", "description": "OEM Metallic Paints"}`
+* **Delete Attribute:** `DELETE /attributes/{id}`
+  * **Relational Guard:** Rejects with `422 Unprocessable Entity` if any attribute value is currently mapped to a product variant.
+* **List Values:** `GET /attributes/{attributeId}/values`
+* **Add Value:** `POST /attributes/{attributeId}/values`
+  * Body: `{"value": "Midnight Black", "color_hex": "#000000", "sort_order": 1}`
+* **Update Value:** `PUT /attributes/{attributeId}/values/{valueId}`
+  * Body: `{"value": "Obsidian Black", "sort_order": 2}`
+* **Delete Value:** `DELETE /attributes/{attributeId}/values/{valueId}`
+  * **Relational Guard:** Rejects with `422 Unprocessable Entity` if value is assigned to any active variant.
+
+### 16.2. Vehicle Fitments & Packaging UOM Conversion Updates
+* **Update Fitment:** `PUT /products/{productId}/fitments/{fitmentId}`
+  * Permissions: `inventory,edit`
+  * Body: `{"make": "Toyota", "model": "Alphard", "year_to": 2024, "notes": "Updated ACES fitment spec"}`
+* **Update UOM Conversion:** `PUT /products/{productId}/uom-conversions/{conversionId}`
+  * Permissions: `inventory,edit`
+  * Body: `{"conversion_factor": 12, "sell_price": 165000, "cost_price": 108000, "barcode": "BOX-12-001"}`
+
+### 16.3. Purchase Return Status Transitions & Lifecycle (RTV)
+* **Endpoints:** `PATCH /purchases/returns/{id}/status` & `PUT /purchases/returns/{id}`
+* **Permissions:** `purchases,edit`
+* **Request Body:**
+```json
+{
+  "status": "Dispatched",
+  "notes": "Handed over to supplier logistics team"
+}
+```
+* **State Machine Rules:**
+  * `Claimed -> Dispatched`: Goods sent to vendor.
+  * `Dispatched -> Credited`: Supplier issues credit memo; ledger finalized.
+  * `Dispatched -> Replaced` or `Claimed -> Replaced`: Supplier delivers fresh replacement goods; catalog stock is atomically incremented and supplier payable balance restored.
+  * `Claimed -> Cancelled`: Warranty/return claim rejected or withdrawn; returns inventory back to catalog and restores supplier payable balance.
+  * `Credited`, `Replaced`, `Cancelled` are terminal states (rejects further transitions with `422 Unprocessable Entity`).
+
+### 16.4. Stock Transfer Variant Matrix Support
+* **Endpoint:** `POST /stock-transfers`
+* **Permissions:** `inventory,adjustStock`
+* **Request Line Item:**
+```json
+{
+  "product_id": 101,
+  "product_variant_id": 45,
+  "qty": 5,
+  "notes": "Stage 3 Ceramic Disc variant"
+}
+```
+* **Behavior:**
+  * When dispatched (`POST /stock-transfers/{id}/dispatch`): Variant row is locked (`lockForUpdate()`), stock verified (`variant.stock >= qty`), and decremented from source.
+  * When received (`POST /stock-transfers/{id}/receive`): Destination increments both warehouse stock and variant inventory balance.
+  * When cancelled (`POST /stock-transfers/{id}/cancel`): Dispatched variant inventory is safely reverted to source warehouse.

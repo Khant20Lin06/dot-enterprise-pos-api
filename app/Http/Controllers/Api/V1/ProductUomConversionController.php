@@ -7,6 +7,7 @@ use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\ProductUomConversion;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\CreateProductUomConversionRequest;
+use App\Http\Requests\V1\UpdateProductUomConversionRequest;
 use App\Http\Resources\V1\ProductUomConversionResource;
 use Illuminate\Http\JsonResponse;
 
@@ -44,6 +45,27 @@ class ProductUomConversionController extends Controller
             'message' => "Packaging unit '{$conversion->unit_name}' configured successfully.",
             'data' => new ProductUomConversionResource($conversion),
         ], 201);
+    }
+
+    /**
+     * Update an existing packaging UOM conversion rule.
+     */
+    public function update(
+        int $productId,
+        int $conversionId,
+        UpdateProductUomConversionRequest $request
+    ): JsonResponse {
+        $conversion = ProductUomConversion::where('product_id', $productId)
+            ->where('id', $conversionId)
+            ->firstOrFail();
+
+        $conversion->update($request->validated());
+
+        return response()->json([
+            'success' => true,
+            'message' => "Packaging unit '{$conversion->unit_name}' updated successfully.",
+            'data' => new ProductUomConversionResource($conversion->fresh('uom')),
+        ]);
     }
 
     /**

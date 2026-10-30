@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domains\Purchasing\Actions\ProcessPurchaseReturnAction;
+use App\Domains\Purchasing\Actions\TransitionPurchaseReturnStatusAction;
 use App\Domains\Purchasing\Models\PurchaseReturn;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\CreatePurchaseReturnRequest;
+use App\Http\Requests\V1\UpdatePurchaseReturnStatusRequest;
 use App\Http\Resources\V1\PurchaseReturnResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -70,5 +72,36 @@ class PurchaseReturnController extends Controller
             'success' => true,
             'data' => new PurchaseReturnResource($purchaseReturn),
         ]);
+    }
+
+    /**
+     * Transition purchase return status (Claimed -> Dispatched -> Credited / Replaced / Cancelled).
+     */
+    public function updateStatus(
+        int $id,
+        UpdatePurchaseReturnStatusRequest $request,
+        TransitionPurchaseReturnStatusAction $action
+    ): JsonResponse {
+        $purchaseReturn = PurchaseReturn::findOrFail($id);
+
+        try {
+            $updated = $action->execute(
+                $purchaseReturn,
+                $request->validated('status'),
+                $request->validated(),
+                $request->user()?->id
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => "Purchase Return #{$updated->return_no} status changed to '{$updated->status}'.",
+                'data' => new PurchaseReturnResource($updated),
+            ]);
+        } catch (\DomainException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 }

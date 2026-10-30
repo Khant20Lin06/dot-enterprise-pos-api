@@ -60,6 +60,7 @@ class CreateStockTransferAction
                 StockTransferItem::create([
                     'stock_transfer_id' => $transfer->id,
                     'product_id' => (int) $item['product_id'],
+                    'product_variant_id' => isset($item['product_variant_id']) ? (int) $item['product_variant_id'] : null,
                     'product_option_id' => isset($item['product_option_id']) ? (int) $item['product_option_id'] : null,
                     'qty_requested' => $qty,
                     'qty_dispatched' => 0,
