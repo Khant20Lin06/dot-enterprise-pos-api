@@ -17,6 +17,12 @@ use App\Http\Controllers\Api\V1\SalesReturnController;
 use App\Http\Controllers\Api\V1\StaffUserController;
 use App\Http\Controllers\Api\V1\StockAdjustmentController;
 use App\Http\Controllers\Api\V1\StockTransferController;
+use App\Http\Controllers\Api\V1\FleetController;
+use App\Http\Controllers\Api\V1\MechanicController;
+use App\Http\Controllers\Api\V1\OutsourcedPartController;
+use App\Http\Controllers\Api\V1\PriceListController;
+use App\Http\Controllers\Api\V1\PromotionController;
+use App\Http\Controllers\Api\V1\PurchaseReturnController;
 use App\Http\Controllers\Api\V1\SupplierController;
 use App\Http\Controllers\Api\V1\UnitOfMeasureController;
 use App\Http\Controllers\Api\V1\VehicleController;
@@ -206,6 +212,38 @@ Route::prefix('v1')->group(function () {
                 ->middleware(['throttle:60,1', 'permission:workshop,edit']);
             Route::post('/work-orders/{id}/convert-to-invoice', [WorkOrderController::class, 'convertToInvoice'])
                 ->middleware(['throttle:60,1', 'permission:workshop,approveJobCard']);
+
+            // Workshop Mechanics & Labor Commissions
+            Route::prefix('mechanics')->group(function () {
+                Route::get('/', [MechanicController::class, 'index'])
+                    ->middleware('permission:workshop,view');
+                Route::post('/', [MechanicController::class, 'store'])
+                    ->middleware('permission:workshop,create');
+                Route::get('/{id}', [MechanicController::class, 'show'])
+                    ->middleware('permission:workshop,view');
+                Route::put('/{id}', [MechanicController::class, 'update'])
+                    ->middleware('permission:workshop,edit');
+                Route::delete('/{id}', [MechanicController::class, 'destroy'])
+                    ->middleware('permission:workshop,edit');
+                Route::get('/{id}/commissions', [MechanicController::class, 'commissions'])
+                    ->middleware('permission:workshop,view');
+                Route::post('/{id}/commissions/payout', [MechanicController::class, 'payoutCommissions'])
+                    ->middleware('permission:finances,approveCreditLimit');
+            });
+
+            // Third-Party Machining & Outsourced Spare Parts
+            Route::prefix('outsourced-parts')->group(function () {
+                Route::get('/', [OutsourcedPartController::class, 'index'])
+                    ->middleware('permission:workshop,view');
+                Route::post('/', [OutsourcedPartController::class, 'store'])
+                    ->middleware('permission:workshop,create');
+                Route::get('/{id}', [OutsourcedPartController::class, 'show'])
+                    ->middleware('permission:workshop,view');
+                Route::put('/{id}', [OutsourcedPartController::class, 'update'])
+                    ->middleware('permission:workshop,edit');
+                Route::delete('/{id}', [OutsourcedPartController::class, 'destroy'])
+                    ->middleware('permission:workshop,edit');
+            });
         });
 
         // Automotive Vehicles Registry & Compatibility Search
@@ -242,6 +280,20 @@ Route::prefix('v1')->group(function () {
                 ->middleware('permission:finances,approveCreditLimit');
             Route::get('/{id}/ledger', [CustomerCreditController::class, 'ledger'])
                 ->middleware('permission:finances,view');
+        });
+
+        // Fleet Accounts & Corporate Logistics
+        Route::prefix('fleets')->group(function () {
+            Route::get('/', [FleetController::class, 'index'])
+                ->middleware('permission:pos,view');
+            Route::post('/', [FleetController::class, 'store'])
+                ->middleware('permission:pos,create');
+            Route::get('/{id}', [FleetController::class, 'show'])
+                ->middleware('permission:pos,view');
+            Route::put('/{id}', [FleetController::class, 'update'])
+                ->middleware('permission:pos,edit');
+            Route::delete('/{id}', [FleetController::class, 'destroy'])
+                ->middleware('permission:settings,manageRoles');
         });
 
         // Executive Reports & Analytics (Restricted to Finance/Admin)
@@ -338,6 +390,45 @@ Route::prefix('v1')->group(function () {
                 ->middleware(['throttle:60,1', 'permission:purchases,approvePO']);
             Route::post('/{id}/cancel', [PurchaseController::class, 'cancel'])
                 ->middleware(['throttle:60,1', 'permission:purchases,edit']);
+
+            // Purchase Returns (Return to Vendor - RTV Debit Notes)
+            Route::prefix('returns')->group(function () {
+                Route::get('/', [PurchaseReturnController::class, 'index'])
+                    ->middleware('permission:purchases,view');
+                Route::post('/', [PurchaseReturnController::class, 'store'])
+                    ->middleware(['throttle:60,1', 'permission:purchases,create']);
+                Route::get('/{id}', [PurchaseReturnController::class, 'show'])
+                    ->middleware('permission:purchases,view');
+            });
+        });
+
+        // Wholesale Pricing Tiers & Promotional Campaigns
+        Route::prefix('pricing')->group(function () {
+            Route::prefix('price-lists')->group(function () {
+                Route::get('/', [PriceListController::class, 'index'])
+                    ->middleware('permission:inventory,view');
+                Route::post('/', [PriceListController::class, 'store'])
+                    ->middleware('permission:inventory,create');
+                Route::get('/{id}', [PriceListController::class, 'show'])
+                    ->middleware('permission:inventory,view');
+                Route::put('/{id}', [PriceListController::class, 'update'])
+                    ->middleware('permission:inventory,edit');
+                Route::delete('/{id}', [PriceListController::class, 'destroy'])
+                    ->middleware('permission:inventory,delete');
+            });
+
+            Route::prefix('promotions')->group(function () {
+                Route::get('/', [PromotionController::class, 'index'])
+                    ->middleware('permission:pos,view');
+                Route::post('/', [PromotionController::class, 'store'])
+                    ->middleware('permission:pos,create');
+                Route::get('/{id}', [PromotionController::class, 'show'])
+                    ->middleware('permission:pos,view');
+                Route::put('/{id}', [PromotionController::class, 'update'])
+                    ->middleware('permission:pos,edit');
+                Route::delete('/{id}', [PromotionController::class, 'destroy'])
+                    ->middleware('permission:pos,create');
+            });
         });
 
         // Physical Stock Adjustments & Audits

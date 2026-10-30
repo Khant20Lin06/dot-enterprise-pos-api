@@ -31,6 +31,7 @@
 | **Phase H** | Master Data CRUD, Inbound Procurement & Workshop Workflow Harmonization (Customers, Vehicles, Purchases, Suppliers, Stock Adjustments) | 🟢 Completed | 100% |
 | **Phase I** | Forensic Hardening: Red-Team Security, Concurrency Locking & Anti-Drift Variant Stock | 🟢 Completed | 100% |
 | **Phase J** | Enterprise Accounting Integrity: Credit Overpayment Change, Supervisor POS Order Voiding & Scoped Held Carts | 🟢 Completed | 100% |
+| **Phase K** | Complete Domain Coverage: Activation of Orphan Models (Fleets, Mechanics, Outsourced Parts, Purchase Returns, Pricing) | 🟢 Completed | 100% |
 
 ---
 
@@ -345,3 +346,36 @@
 - [x] **Pest Feature Test Suite:**
   - `tests/Feature/Phase2AccountingAndVoidTest.php`: 6 passed (31 assertions).
   - Full Test Suite: **128 passed (629 assertions) — 100% pass rate in 13.32s**.
+
+---
+
+### Phase K: Complete Domain Coverage: Activation of Orphan Models (Fleets, Mechanics, Outsourced Parts, Purchase Returns, Pricing)
+- [x] **Fleet Management Module:**
+  - Built `FleetController` (`index`, `store`, `show`, `update`, `destroy`) with strict relational delete guards protecting linked vehicles and customer accounts.
+  - Form Requests: `CreateFleetRequest`, `UpdateFleetRequest` with unique code and tax number validations.
+  - JSON Resource: `FleetResource` exposing vehicle count and formatted credit limits.
+- [x] **Workshop Mechanics & Commission Disbursement Module:**
+  - Built `MechanicController` managing mechanics lifecycle and commission payout auditing.
+  - Form Requests: `CreateMechanicRequest`, `UpdateMechanicRequest`, `PayoutCommissionRequest`.
+  - JSON Resources: `MechanicResource`, `MechanicCommissionResource`.
+  - Transactional Commission Payout: `POST /api/v1/workshop/mechanics/{id}/commissions/payout` marks pending commissions paid with atomic audit logging.
+- [x] **Workshop Outsourced Third-Party Parts & Machining Module:**
+  - Built `OutsourcedPartController` (`index`, `store`, `show`, `update`, `destroy`) managing third-party subcontracted lathe/machining/specialty parts.
+  - Form Requests: `CreateOutsourcedPartRequest`, `UpdateOutsourcedPartRequest`.
+  - JSON Resource: `OutsourcedPartResource` calculating profit margins and delivery tracking.
+- [x] **Inbound Procurement Return to Vendor (RTV) Module:**
+  - Domain Action: `ProcessPurchaseReturnAction` decrements inventory atomically with pessimistic locking (`lockForUpdate()`), adjusts physical warehouse stocks, and debits supplier outstanding payable debt.
+  - Built `PurchaseReturnController` (`index`, `store`, `show`).
+  - Form Request: `CreatePurchaseReturnRequest` validating purchase status, product existence, and return quantity limits.
+  - JSON Resource: `PurchaseReturnResource`.
+- [x] **Wholesale Price Lists & Promotional Campaigns Module:**
+  - Built `PriceListController` (`index`, `store`, `show`, `update`, `destroy`) managing wholesale customer discount tiers and quantity volume breaks.
+  - Built `PromotionController` (`index`, `store`, `show`, `update`, `destroy`) managing date-bounded percentage and fixed discount marketing campaigns.
+  - Form Requests: `CreatePriceListRequest`, `UpdatePriceListRequest`, `CreatePromotionRequest`, `UpdatePromotionRequest`.
+  - JSON Resources: `PriceListResource`, `PromotionResource`.
+- [x] **API Route Registration:**
+  - Added 31 RESTful endpoints in `routes/api.php` under `fleets`, `workshop/mechanics`, `workshop/outsourced-parts`, `purchases/returns`, and `pricing/price-lists`, `pricing/promotions`.
+  - Total registered API routes expanded from 133 to 164.
+- [x] **Pest Feature Test Suite:**
+  - `tests/Feature/Phase3OrphanModelsActivationTest.php`: 5 passed (41 assertions).
+  - Full Test Suite: **133 passed (670 assertions) — 100% pass rate in 8.20s**.

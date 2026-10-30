@@ -1319,3 +1319,45 @@
 ```
 * **Response (200 OK):** Transitions transaction to `successful` and confirms associated order payment split.
 * **Error Response (403 Forbidden):** Returns `403` if `X-Signature` header is missing or does not match calculated HMAC.
+
+---
+
+## 12. Enterprise Extensions & Activated Modules
+
+### 12.1. Fleet Accounts Management
+* **List Fleets:** `GET /fleets`
+* **Create Fleet:** `POST /fleets`
+* **Get Fleet:** `GET /fleets/{id}`
+* **Update Fleet:** `PUT /fleets/{id}`
+* **Delete Fleet:** `DELETE /fleets/{id}` (Protected by relational checks; rejects deletion if vehicles or customers are linked).
+
+### 12.2. Workshop Mechanics & Commission Payouts
+* **List Mechanics:** `GET /workshop/mechanics`
+* **Create Mechanic:** `POST /workshop/mechanics`
+* **Get Mechanic:** `GET /workshop/mechanics/{id}`
+* **Update Mechanic:** `PUT /workshop/mechanics/{id}`
+* **Delete Mechanic:** `DELETE /workshop/mechanics/{id}`
+* **List Commissions:** `GET /workshop/mechanics/{id}/commissions` (Supports `status=Pending` filter).
+* **Disburse Commission Payout:** `POST /workshop/mechanics/{id}/commissions/payout`
+  * Request Body: `{"commission_ids": [1, 2, 3], "notes": "End of month disbursement"}`
+  * Atomically marks pending commission records as `Paid`.
+
+### 12.3. Workshop Subcontracted Outsourced Parts
+* **List Outsourced Parts:** `GET /workshop/outsourced-parts`
+* **Create Outsourced Part:** `POST /workshop/outsourced-parts`
+* **Get Outsourced Part:** `GET /workshop/outsourced-parts/{id}`
+* **Update Outsourced Part:** `PUT /workshop/outsourced-parts/{id}`
+* **Delete Outsourced Part:** `DELETE /workshop/outsourced-parts/{id}`
+
+### 12.4. Inbound Procurement Returns (RTV - Return To Vendor)
+* **List Returns:** `GET /purchases/returns`
+* **Create Return:** `POST /purchases/returns`
+  * Request Body: `{"purchase_id": 1, "product_id": 5, "qty": 3, "warehouse_id": 1, "reason": "Defective parts"}`
+  * Atomically decrements catalog and warehouse stock, credits supplier outstanding debt balance, and generates sequential `PRTN` return voucher.
+* **Get Return:** `GET /purchases/returns/{id}`
+
+### 12.5. Wholesale Price Lists & Promotional Campaigns
+* **Wholesale Price Lists:** `GET|POST /pricing/price-lists`, `GET|PUT|DELETE /pricing/price-lists/{id}`
+  * Supports fixed and percentage rules by product with minimum volume breaks.
+* **Promotions & Campaigns:** `GET|POST /pricing/promotions`, `GET|PUT|DELETE /pricing/promotions/{id}`
+  * Supports date-bounded discount campaigns (fixed/percent) with customer tier filtering and usage limits.

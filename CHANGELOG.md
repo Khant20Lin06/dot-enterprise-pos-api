@@ -8,6 +8,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Phase 3 Implementation: Complete Domain Coverage: Activation of Orphan Models (Fleets, Mechanics, Outsourced Parts, Purchase Returns, Pricing):**
+  - **Fleet Management Module (`FleetController`, `CreateFleetRequest`, `UpdateFleetRequest`, `FleetResource`):**
+    - Endpoints: `GET /api/v1/fleets`, `POST /fleets`, `GET /fleets/{id}`, `PUT /fleets/{id}`, `DELETE /fleets/{id}`.
+    - Added relational deletion safety guards rejecting deletion when active vehicles or customer profiles remain linked to the fleet (`422 Unprocessable Entity`).
+  - **Workshop Mechanics & Commission Disbursement Module (`MechanicController`, `CreateMechanicRequest`, `UpdateMechanicRequest`, `PayoutCommissionRequest`, `MechanicResource`, `MechanicCommissionResource`):**
+    - Endpoints: `GET /api/v1/workshop/mechanics`, `POST /workshop/mechanics`, `GET /workshop/mechanics/{id}`, `PUT /workshop/mechanics/{id}`, `DELETE /workshop/mechanics/{id}`, `GET /workshop/mechanics/{id}/commissions`, `POST /workshop/mechanics/{id}/commissions/payout`.
+    - Implemented atomic transactional payout action marking pending mechanic commissions as `Paid` with sequential audit logging.
+  - **Workshop Outsourced Parts & Machining Module (`OutsourcedPartController`, `CreateOutsourcedPartRequest`, `UpdateOutsourcedPartRequest`, `OutsourcedPartResource`):**
+    - Endpoints: `GET /api/v1/workshop/outsourced-parts`, `POST /workshop/outsourced-parts`, `GET /workshop/outsourced-parts/{id}`, `PUT /workshop/outsourced-parts/{id}`, `DELETE /workshop/outsourced-parts/{id}`.
+    - Tracks third-party machine shop and subcontracted parts, computing profit margins and monitoring delivery/fitment statuses.
+  - **Inbound Procurement Return to Vendor (RTV) Module (`ProcessPurchaseReturnAction`, `PurchaseReturnController`, `CreatePurchaseReturnRequest`, `PurchaseReturnResource`):**
+    - Endpoints: `GET /api/v1/purchases/returns`, `POST /purchases/returns`, `GET /purchases/returns/{id}`.
+    - Transactionally deducts physical warehouse stocks and catalog inventory with pessimistic row locks (`lockForUpdate()`), credits supplier outstanding accounts payable balances, and assigns sequential `PRTN` return reference numbers.
+  - **Wholesale Price Lists & Promotional Discount Campaigns Module (`PriceListController`, `PromotionController`, `CreatePriceListRequest`, `UpdatePriceListRequest`, `CreatePromotionRequest`, `UpdatePromotionRequest`, `PriceListResource`, `PromotionResource`):**
+    - Price Lists: `GET /api/v1/pricing/price-lists`, `POST /pricing/price-lists`, `GET /pricing/price-lists/{id}`, `PUT /pricing/price-lists/{id}`, `DELETE /pricing/price-lists/{id}`.
+    - Promotions: `GET /api/v1/pricing/promotions`, `POST /pricing/promotions`, `GET /pricing/promotions/{id}`, `PUT /pricing/promotions/{id}`, `DELETE /pricing/promotions/{id}`.
+    - Supports customer tier-based wholesale pricing, minimum order quantities, fixed/percentage markdowns, and date-bounded marketing campaigns.
+  - **Automated Pest Feature Test Suite:**
+    - `tests/Feature/Phase3OrphanModelsActivationTest.php`: 5 extensive feature tests verifying full CRUD lifecycles, relational delete barriers, commission disbursements, vendor return stock/debt adjustments, and promotional campaigns.
+    - Repository Test Suite: **133 passed (670 assertions) — 100% pass rate in 8.20s**.
 - **Phase 2 Implementation: Enterprise Accounting Integrity: Credit Overpayment Change, Supervisor POS Order Voiding & Scoped Held Carts:**
   - **Database Schema Migration (`2026_10_30_000015_phase2_accounting_integrity_and_void.php`):**
     - Added `tendered_amount` and `change_amount` columns to `credit_settlements`.
