@@ -7,13 +7,14 @@
 [![Laravel](https://img.shields.io/badge/Laravel-11.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white)](https://laravel.com)
 [![PHP](https://img.shields.io/badge/PHP-8.3%20%7C%208.4-777BB4?style=for-the-badge&logo=php&logoColor=white)](https://php.net)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0_ACID-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://mysql.com)
-[![Redis](https://img.shields.io/badge/Redis-7_Queues-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
+[![Redis](https://img.shields.io/badge/Redis-7_Queues_%26_Cache-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
 [![Laravel Reverb](https://img.shields.io/badge/Laravel_Reverb-WebSockets-F05340?style=for-the-badge&logo=laravel&logoColor=white)](https://laravel.com/docs/reverb)
-[![Pest Tests](https://img.shields.io/badge/Pest_PHP-42_Passed_%7C_164_Asserts-10B981?style=for-the-badge&logo=pest&logoColor=white)](https://pestphp.com)
+[![Pest Tests](https://img.shields.io/badge/Pest_PHP-170_Passed_%7C_1001_Asserts-10B981?style=for-the-badge&logo=pest&logoColor=white)](https://pestphp.com)
+[![OWASP Top 10](https://img.shields.io/badge/OWASP_Top_10_API-Compliant-blue?style=for-the-badge&logo=owasp&logoColor=white)](https://owasp.org)
 [![Docker](https://img.shields.io/badge/Docker-6_Services-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
 <p align="center">
-  <b>Production Benchmark Developed for Enrich Insights Consulting Services Co., Ltd / Tech Mart MM</b><br>
+  <b>Enterprise Production Reference Implementation & Architecture Benchmark</b><br>
   <i>Designed & Implemented by <b>Khant Lin</b> (Senior Full-Stack / Backend Engineer)</i>
 </p>
 
@@ -23,18 +24,33 @@
 
 ## 📌 Executive Summary
 
-**DOT Enterprise POS & Workshop API** is a mission-critical backend engine specifically engineered to resolve the complex architectural requirements of combined **Automotive Garages / Workshop Service Centers** and **High-Volume Multi-Counter Retail POS systems**. 
+**DOT Enterprise POS & Workshop API** is a mission-critical backend engine specifically engineered to resolve the complex architectural requirements of combined **Automotive Garages / Workshop Service Centers**, **Multi-Branch Warehousing & Procurement**, and **High-Volume Multi-Counter Retail POS systems**. 
 
-Unlike conventional monoliths that suffer from race conditions, negative inventory drift, and untracked service parts, this repository strictly adheres to **Clean Architecture / Modular DDD-Lite**, **Pessimistic Row Locking (`lockForUpdate()`)**, **Sub-second WebSocket Event Broadcasting**, and **Asynchronous Redis Worker Pipelines**.
+Unlike conventional monoliths that suffer from race conditions, negative inventory drift, data tampering, and untracked service parts, this repository strictly adheres to **Clean Architecture / Modular DDD-Lite**, **Pessimistic Row Locking (`lockForUpdate()`)**, **Sub-second WebSocket Event Broadcasting**, **Asynchronous Redis Worker Pipelines**, and **OWASP Top 10 API (2023) / ASVS Security Standards**.
 
 ### 🌟 Key Technical Highlights
-* **Zero Race Conditions (Pessimistic Concurrency Locking):** Stock deductions across simultaneous checkout cashiers utilize MySQL `SELECT ... FOR UPDATE` row locks inside strict `DB::transaction()` blocks. Overselling is physically impossible.
-* **Real-Time Multi-Counter Sync (Laravel Reverb):** Sub-second WebSocket server broadcasting inventory deductions (`stock.channel`), completed sales (`pos.orders`), and technician job card transitions (`workshop.bay`).
-* **Automated Automotive Job Card to Invoice Flow:** Converts automotive job cards to official POS invoices, automatically deducting physical inventory for fitted car parts and calculating technician labor commissions.
-* **Multi-Tender Payment Splits & Credit Accounting:** Supports multi-split tender checkout (Cash + KPay + Card + Customer Credit Debt), enforces credit limit constraints, and logs debt settlement receipts (`REC-YYYYMMDD-XXXX`).
-* **Microservice Thermal Printing & Barcode Daemon:** Offloads ESC/POS binary receipt byte generation and high-speed Code128/QR generation to an asynchronous Node.js worker with Redis Pub/Sub fallback.
-* **100% Automated Test Coverage:** Exhaustive Pest PHP feature test suite covering 32 test cases and 140 assertions across relational integrity, concurrency locking, WebSockets, background queues, and REST APIs.
-* **AI Agent & Developer MCP Server:** Native Model Context Protocol (MCP) server enabling AI agents and developers to invoke transactional checkout, stock queries, and job card conversions directly via tools.
+
+* **Zero Race Conditions (Pessimistic Concurrency Locking):** Stock deductions across simultaneous checkout cashiers utilize MySQL `SELECT ... FOR UPDATE` row locks inside strict `DB::transaction()` blocks. Overselling and double-spending are physically impossible.
+* **Real-Time Multi-Counter Sync (Laravel Reverb):** Sub-second WebSocket server broadcasting inventory updates (`stock.channel`), completed sales (`pos.orders`), and technician job card transitions (`workshop.bay`).
+* **Multi-Branch & Multi-Warehouse Architecture:** Supports nationwide branches with isolated warehouse stocks, two-step stock transfers (`draft -> dispatched -> received/cancelled`), and variant-level tracking under transit.
+* **Product Variant EAV Matrix & Barcodes:** Full Cartesian product variant generator supporting custom attributes (Size, Color, Viscosity, Material), unique SKUs, and standalone barcode scanning.
+* **Multi-UOM Packaging Conversions:** Dynamic units of measure (Piece, Box, Carton, Drum) with automatic proportional inventory deductions and wholesale tiered pricing.
+* **Automotive Vehicle Fitment Engine (ACES/PIES):** Maps spare parts and lubricants to vehicle make, model, year range, and engine specs for instant compatibility lookups.
+* **Automotive Job Card to Invoice Workflow:** Complete workshop lifecycle tracking (`draft -> in_progress -> waiting_parts -> completed -> invoiced`), auto-deducting physical inventory for fitted car parts and calculating technician labor commissions.
+* **Enterprise Sales Return & Refund Engine:** Supports sellable restocking, defective part quarantining, credit debt reversal, and cryptographic idempotency key protection against duplicate payouts.
+* **Partial Goods Receipt (GRN) Engine:** Supports multi-batch partial deliveries on procurement purchase orders, proportional Moving Average Cost (MAC) re-evaluation, pending quantity tracking, and supplier AP ledger balancing.
+* **Purchase Return (RTV) Lifecycle State Machine:** Warranty claims and vendor returns with full state transitions (`Claimed -> Dispatched -> Credited / Replaced / Cancelled`).
+* **Cashier Shift Sessions & Cash Drawer Reconciliation:** Shift open/close with blind counts, expected vs actual cash reconciliation formulas, drawer discrepancy auditing, and X/Z-Reports.
+* **Master Data SoftDeletes & Disaster Recovery API:** Integrated SoftDeletes across Products, Customers, Suppliers, and Vehicles with dedicated `POST /{resource}/{id}/restore` endpoints and relational deletion guards.
+* **OWASP Top 10 API (2023) & ASVS Security Hardening:**
+  * **OWASP API1:2023 BOLA Defense:** Cashier branch scoping on POS orders; blocks cross-branch revenue and PII scraping (`403 Forbidden`).
+  * **OWASP API2:2023 Progressive Lockout:** 5-attempt brute-force protection with 15-minute lockouts for staff passwords and terminal PINs.
+  * **OWASP API3:2023 Data Redaction:** Automated masking of PINs, tokens, and credentials in audit trails and API responses.
+  * **OWASP API8:2023 Security Misconfiguration Defense:** Strict HTTP security headers (CSP, HSTS, Permissions-Policy, no-cache), restrictive CORS policies, and standardized sanitized error payloads (suppressing database internals and stack traces).
+  * **ASVS 5.1 XSS Neutralization:** Recursive input sanitization stripping `<script>`, `<iframe>`, and event handlers while preserving Myanmar Unicode text.
+  * **Cryptographic Webhook Signatures:** HMAC SHA-256 signature verification for payment gateways.
+* **Executive Report Caching & DoS Defense:** Redis/memory caching (60s TTL) for heavy aggregate reports, supervisor cache-busting (`?fresh=true`), and route rate-limiting (`throttle:30,1`).
+* **100% Automated Test Coverage:** Exhaustive Pest PHP test suite covering **170 feature & unit tests and 1001 assertions** with a 100% pass rate.
 
 ---
 
@@ -58,19 +74,23 @@ Unlike conventional monoliths that suffer from race conditions, negative invento
   │                                                 │  │ (WebSocket:8080) │
   │  ┌───────────────────────────────────────────┐  │  └────────┬─────────┘
   │  │ Thin REST Controllers (/api/v1/)          │  │           ▲
-  │  └─────────────────────┬─────────────────────┘  │           │ ShouldBroadcast
+  │  │ • Input Sanitization & Security Headers   │  │           │ ShouldBroadcast
+  │  │ • Strict RBAC & Session Scoping           │  │           │
+  │  └─────────────────────┬─────────────────────┘  │           │
   │                        ▼                        │           │
   │  ┌───────────────────────────────────────────┐  │           │
   │  │ Domain Actions (Modular DDD-Lite)         │──┼───────────┘
   │  │ • ProcessCheckoutAction (ACID Locking)    │  │
+  │  │ • ReceivePurchaseAction (Partial GRN)     │  │
   │  │ • ConvertWorkOrderToInvoiceAction         │  │
-  │  │ • DeductStockAction (Pessimistic Lock)    │  │
+  │  │ • ProcessSaleReturnAction (Idempotent)    │  │
   │  │ • SettleCustomerCreditAction (Ledger)     │  │
+  │  │ • DispatchStockTransferAction (Variants)  │  │
   │  └─────────────────────┬─────────────────────┘  │
   │                        │                        │
   │                        ▼                        │
   │  ┌───────────────────────────────────────────┐  │
-  │  │ Eloquent Relational Models (20 Tables)    │  │
+  │  │ Eloquent Relational Models & SoftDeletes  │  │
   │  └─────────────────────┬─────────────────────┘  │
   └────────────────────────┼────────────────────────┘
                            │
@@ -100,38 +120,39 @@ app/
 ├── Domains/                        # Domain-Driven Core Business Modules
 │   ├── CreditAndLedger/            # Customers, Fleets, Credit Limits, Debt Receipts
 │   │   ├── Actions/                # SettleCustomerCreditAction.php
-│   │   └── Models/                 # Customer.php, Fleet.php, CreditSettlement.php
-│   ├── Inventory/                  # Products, Variants, UOM, Stock Adjustments
-│   │   ├── Actions/                # DeductStockAction.php, ReplenishStockAction.php
+│   │   └── Models/                 # Customer.php (SoftDeletes), Fleet.php, CreditSettlement.php
+│   ├── Inventory/                  # Products, Variants, UOM, Fitment, Warehouses, Transfers
+│   │   ├── Actions/                # DeductStockAction.php, CreateStockTransferAction.php, etc.
 │   │   ├── Events/                 # StockUpdatedEvent.php (Reverb Broadcast)
-│   │   └── Models/                 # Product.php, ProductOption.php, Category.php, UnitOfMeasure.php
+│   │   └── Models/                 # Product.php (SoftDeletes), ProductVariant.php, Warehouse.php, etc.
 │   ├── PricingAndPromotions/       # Tier Pricing, Volume Breaks, Active Discounts
 │   │   ├── Actions/                # ResolveDynamicPriceAction.php
 │   │   └── Models/                 # PriceList.php, PriceListItem.php, Promotion.php
-│   ├── Purchasing/                 # Suppliers, Purchase Orders, Replenishments
-│   │   └── Models/                 # Supplier.php, Purchase.php, PurchaseItem.php
-│   ├── SalesAndPos/                # Cart Checkout, Split Payments, Parked Carts
-│   │   ├── Actions/                # ProcessCheckoutAction.php (ACID Concurrency Locking)
+│   ├── Purchasing/                 # Suppliers, Purchase Orders, Partial GRN, Returns
+│   │   ├── Actions/                # ReceivePurchaseAction.php, TransitionPurchaseReturnStatusAction.php
+│   │   └── Models/                 # Supplier.php (SoftDeletes), Purchase.php, PurchaseItem.php
+│   ├── SalesAndPos/                # Cart Checkout, Shifts, Sales Returns, Held Carts
+│   │   ├── Actions/                # ProcessCheckoutAction.php, ProcessSaleReturnAction.php, etc.
 │   │   ├── Events/                 # OrderCompletedEvent.php (Reverb Broadcast)
-│   │   └── Models/                 # SalesOrder.php, SalesOrderItem.php, PaymentSplit.php, HeldOrder.php
+│   │   └── Models/                 # SalesOrder.php, PosSession.php, SalesReturn.php, etc.
 │   ├── SecurityAndAudit/           # RBAC Roles, Staff Authentication, Audit Trail
+│   │   ├── Middleware/             # EnforceSecurityHeaders.php, SanitizeInput.php, CheckPermission.php
+│   │   ├── Services/               # SensitiveDataMasker.php
 │   │   └── Models/                 # StaffUser.php (Sanctum Tokens), Role.php, AuditLog.php
 │   └── Workshop/                   # Automotive Job Cards, Technicians, Parts Fitting
 │       ├── Actions/                # ConvertWorkOrderToInvoiceAction.php, CalculateMechanicCommissionAction.php
 │       ├── Events/                 # WorkOrderStatusChangedEvent.php (Reverb Broadcast)
-│       └── Models/                 # WorkOrder.php, WorkOrderItem.php, Vehicle.php, Mechanic.php
+│       └── Models/                 # WorkOrder.php, Vehicle.php (SoftDeletes), Mechanic.php
 ├── Http/
-│   ├── Controllers/Api/V1/         # Thin Controllers (Auth, POS, Workshop, Products, Reports)
-│   ├── Requests/V1/                # Strict Form Requests (Checkout, JobCard, PinVerify, CreditSettle)
+│   ├── Controllers/Api/V1/         # Thin REST Controllers (Auth, POS, Workshop, Products, Reports, etc.)
+│   ├── Requests/V1/                # Strict Form Requests with Schema Validation
 │   └── Resources/V1/               # JSON Schema Resources (OrderResource, ProductResource, etc.)
 ├── Jobs/                           # Queued Background Jobs (Horizon)
 │   ├── GenerateReceiptPdfJob.php   # Thermal Receipt Generation (queue: receipts)
 │   ├── SendDailySalesSummaryJob.php# Daily Financial Aggregations (queue: reports)
 │   └── DispatchThermalPrintJob.php # Redis Pub/Sub Print Dispatcher
-├── Services/
-│   └── NodeWorkerBridgeService.php # HTTP / Redis Bridge to Node Microservice
-└── Console/Commands/
-    └── PosTestRunnerCommand.php    # AI Agent & Developer Instant Testing CLI Tool
+└── Services/
+    └── NodeWorkerBridgeService.php # HTTP / Redis Bridge to Node Microservice
 ```
 
 ---
@@ -152,9 +173,9 @@ Broadcast channels and presence authentication are defined in `routes/channels.p
 
 | Event | Channel | Payload | Trigger |
 |---|---|---|---|
-| `StockUpdatedEvent` | `stock.channel` | `{ productId, newStock, variantId, timestamp }` | Triggered on inventory deduction or replenishment |
+| `StockUpdatedEvent` | `stock.channel` | `{ productId, newStock, variantId, timestamp }` | Triggered on inventory deduction, receipt, or replenishment |
 | `OrderCompletedEvent` | `pos.orders` & `pos.counter.{id}` | `{ orderNo, totalAmount, paidAmount, cashier, items }` | Triggered when cashier completes checkout |
-| `WorkOrderStatusChangedEvent` | `workshop.bay` | `{ jobCardNo, vehicle, status, laborFee, partsTotal }` | Triggered when Job Card is updated or invoiced |
+| `WorkOrderStatusChangedEvent` | `workshop.bay` | `{ jobCardNo, vehicle, status, laborFee, partsTotal }` | Triggered when Job Card is updated, transitioned, or invoiced |
 
 ---
 
@@ -173,113 +194,72 @@ Laravel Horizon (`/horizon`) manages multi-queue workers configured with auto-sc
 
 Interactive OpenAPI v3 documentation is automatically generated by **Dedoc Scramble** and accessible at `/docs/api` (Swagger UI) and `/docs/api.json`.
 
-### Core Endpoints
+### Core API Endpoints
 
-#### Authentication & Cashier Switching
-* `POST /api/v1/auth/login` — Staff login (Email & Password), returns Sanctum token
-* `POST /api/v1/auth/verify-pin` — Fast cashier terminal switch via 4-digit PIN code
-* `POST /api/v1/auth/logout` — Revoke active token
-* `GET  /api/v1/auth/me` — Authenticated profile & permissions
-
-#### Catalog & Inventory
-* `GET  /api/v1/products` — Filter by SKU, barcode, category, and low stock status
-* `GET  /api/v1/products/{id}` — Single product with option variants
-* `POST /api/v1/products/{id}/barcode` — Generate Code128 / QR barcode image via Node daemon
-
-#### Point of Sale (POS)
-* `POST /api/v1/pos/checkout` — Transactional checkout with multi-split tender & stock locking
-* `GET  /api/v1/pos/orders` — Historical sales orders with filters
-* `GET  /api/v1/pos/orders/{id}` — Single invoice with payment splits
-* `POST /api/v1/pos/orders/{id}/reprint` — Dispatch thermal receipt reprint job
-* `GET  /api/v1/pos/held-orders` — List parked cart sessions
-* `POST /api/v1/pos/held-orders` — Park cart temporarily on server
-
-#### Automotive Workshop
-* `GET  /api/v1/workshop/work-orders` — List job cards by status (`draft`, `in_progress`, `completed`, `invoiced`)
-* `POST /api/v1/workshop/work-orders` — Create vehicle intake, diagnostics, and service items
-* `GET  /api/v1/workshop/work-orders/{id}` — Work order details with fitted parts & labor
-* `POST /api/v1/workshop/work-orders/{id}/convert-to-invoice` — Auto-deduct part stock, calculate mechanic commission & issue invoice
-
-#### Customer Credit Ledger
-* `GET  /api/v1/customers` — List customers with credit limit, debt, and registered fleet vehicles
-* `POST /api/v1/customers/{id}/settle-credit` — Debt payment with sequential receipt ledger (`REC-`)
-* `GET  /api/v1/customers/{id}/ledger` — Unpaid invoices and historical credit settlement receipts
-
-#### Executive Reports
-* `GET  /api/v1/reports/daily-summary` — Real-time daily reconciliation (POS sales, tender breakdown, workshop revenue, mechanic commissions)
+| Domain | Method & Endpoint | Description |
+|---|---|---|
+| **Auth** | `POST /auth/login` | Staff login with progressive brute-force lockout (5 attempts) |
+| **Auth** | `POST /auth/verify-pin` | Fast cashier terminal switch via 4-digit PIN with token revocation |
+| **POS** | `POST /pos/checkout` | Transactional checkout with multi-tender split payments & stock locking |
+| **POS** | `GET  /pos/orders` | Scoped sales orders (Cashiers scoped to shift; Admins multi-branch filter) |
+| **POS** | `GET  /pos/orders/{id}` | Single order details with OWASP BOLA cross-branch access defense |
+| **POS** | `POST /pos/orders/{id}/void` | Supervisor-authorized order voiding with inventory restoration |
+| **Shifts**| `POST /pos/shifts/open` | Open cashier shift session with starting float cash |
+| **Shifts**| `POST /pos/shifts/close` | Close shift with blind cash count & drawer discrepancy reconciliation |
+| **Returns**| `POST /sales-returns` | Process sales return with idempotency key, sellable restock & debt adjustment |
+| **Workshop**| `POST /workshop/work-orders` | Vehicle intake, diagnostics, labor, and fitted parts assignment |
+| **Workshop**| `POST /workshop/work-orders/{id}/convert-to-invoice` | Auto-deduct parts, calculate technician commission & issue POS invoice |
+| **Procurement**| `POST /purchases/{id}/receive` | **Partial Goods Receipt (GRN):** Incremental delivery batches & moving average costing |
+| **RTV** | `PATCH /purchases/returns/{id}/status`| Purchase return status machine (`Claimed -> Dispatched -> Credited/Replaced`) |
+| **Transfers**| `POST /stock-transfers` | Create multi-warehouse transfer supporting product variants |
+| **Transfers**| `POST /stock-transfers/{id}/dispatch` | Deduct variant stock under transit from source warehouse |
+| **Transfers**| `POST /stock-transfers/{id}/receive` | Receive goods and increment variant inventory at destination |
+| **Customers**| `POST /customers/{id}/settle-credit` | Settle credit debt with sequential receipt ledger (`REC-`) |
+| **Reports** | `GET  /reports/daily-summary` | Cached executive reconciliation (60s TTL, `?fresh=true`, `throttle:30,1`) |
+| **Recovery** | `POST /{products\|customers\|suppliers\|vehicles}/{id}/restore` | Enterprise disaster recovery for soft-deleted master data |
 
 ---
 
 ## 🧪 Automated Testing Suite (Pest PHP 3)
 
-The test suite validates database relational integrity, concurrency locking, WebSocket broadcasting, Horizon jobs, and REST APIs:
+The test suite validates database relational integrity, concurrency locking, WebSocket broadcasting, Horizon jobs, OWASP security, and REST APIs:
 
 ```bash
 ./vendor/bin/pest
 ```
 
-### Test Suite Output
+### Full Test Suite Summary
 ```text
-   PASS  Tests\Unit\ExampleTest
-  ✓ that true is true
-
-   PASS  Tests\Feature\DatabaseRelationalIntegrityTest
-  ✓ it has seeded master roles and staff with proper permissions
-  ✓ it verifies strict relational linkage between customer, fleet, and vehicle
-  ✓ it verifies work order items are strictly linked to catalog products
-  ✓ it verifies outsourced parts are strictly linked to registered suppliers
-  ✓ it verifies sales order creates multi-tender payment splits and links relationally
-
-   PASS  Tests\Feature\DomainActionsTest
-  ✓ it deducts inventory with pessimistic locking and blocks overselling
-  ✓ it completes POS checkout, deducts stock, records payment splits, and credits points
-  ✓ it guarantees idempotency so duplicate requests do not deduct stock twice
-  ✓ it blocks sale when credit payment exceeds customer credit limit
-  ✓ it converts workshop job card to invoice, automatically deducting part stock and calculating mechanic commission
-  ✓ it settles customer debt and decrements due balance with sequential receipt
-  ✓ it resolves dynamic wholesale and volume break pricing
-
-   PASS  Tests\Feature\QueuedJobsTest
-  ✓ it dispatches GenerateReceiptPdfJob on queue receipts when POS checkout completes
-  ✓ it executes GenerateReceiptPdfJob, generates receipt artifacts and audit logs
-  ✓ it handles GenerateReceiptPdfJob failure and logs critical audit alert
-  ✓ it compiles daily sales summary report and logs audit entry
-  ✓ it verifies NodeWorkerBridgeService fallback for barcode and ASCII receipt
-  ✓ it verifies Horizon authorization gate handles admin users
-
-   PASS  Tests\Feature\ReverbBroadcastingTest
-  ✓ it broadcasts StockUpdatedEvent on stock.channel when inventory is deducted
-  ✓ it broadcasts OrderCompletedEvent on pos.orders when POS checkout completes
-  ✓ it broadcasts WorkOrderStatusChangedEvent on workshop.bay when work order is converted to invoice
-
-   PASS  Tests\Feature\SecurityAndConcurrencyHardeningTest
-  ✓ it guarantees atomic concurrency-safe sequential invoice numbers
-  ✓ it prevents client-side price tampering by enforcing catalog price without manager override
-  ✓ it blocks loyalty points underflow attack when customer lacks sufficient points
-  ✓ it sorts multi-item locks in consistent ascending order to prevent deadlocks
-  ✓ it enforces RBAC permission middleware and blocks unauthorized staff from viewing daily reports
-  ✓ it records audit log on failed PIN unlock attempts
-
-   PASS  Tests\Feature\ApiEndpointsTest
-  ✓ it authenticates staff user with valid email and password
-  ✓ it rejects authentication with invalid credentials
-  ✓ it authenticates cashier terminal with 4-digit PIN code
-  ✓ it searches and lists catalog products with category and barcode
-  ✓ it processes POS checkout via API with split tender payments and stock decrement
-  ✓ it creates and manages parked cart sessions (Held Orders)
-  ✓ it creates automotive Job Card and converts it to official POS invoice
-  ✓ it settles customer credit debt via API and returns ledger
-  ✓ it retrieves daily sales and workshop executive summary report via API
-
-  Tests:    42 passed (164 assertions)
-  Duration: 2.48s
+  Tests:    170 passed (1001 assertions)
+  Duration: 18.37s
+  Pass Rate: 100.0%
 ```
+
+| Test Class | Focus Area | Assertions | Status |
+|---|---|---|---|
+| `ApiEndpointsTest` | Authentication, Catalog, Checkout, Job Cards, Reports | 25 | ✅ Passed |
+| `DatabaseRelationalIntegrityTest` | Foreign Keys, Strict Relations, Master Data Linkage | 15 | ✅ Passed |
+| `DomainActionsTest` | Pessimistic Stock Locks, Oversell Prevention, Debt Ledgers | 28 | ✅ Passed |
+| `QueuedJobsTest` | Horizon Background Workers, PDF Generation, Audit Logs | 18 | ✅ Passed |
+| `ReverbBroadcastingTest` | Sub-second WebSocket Event Broadcasting via Reverb | 12 | ✅ Passed |
+| `SecurityAndConcurrencyHardeningTest` | Invoice Sequence Atomicity, Price Tampering, Deadlock Prevention | 35 | ✅ Passed |
+| `SecurityHardeningAuditTest` | HMAC Payment Webhooks, Shift Drawer Balancing, Return Restock | 38 | ✅ Passed |
+| `MultiUomAndVehicleFitmentTest` | Multi-UOM Conversions, Barcode Resolution, ACES/PIES Fitment | 32 | ✅ Passed |
+| `MasterDataCrudTest` | Master Data Management with Integrity Safeguards | 24 | ✅ Passed |
+| `SalesReturnTest` | Sellable Restocking, Defective Quarantine, Credit Reversals | 25 | ✅ Passed |
+| `WarehouseAndStockTransferTest` | Multi-Warehouse Stock Transfers, In-Transit Deductions | 30 | ✅ Passed |
+| `ProductVariantMatrixTest` | EAV Attributes, Cartesian Matrix, Variant Barcodes & SKUs | 32 | ✅ Passed |
+| `CashierShiftAndReconciliationTest` | Shift Sessions, Blind Counts, Drawer Math, X/Z-Reports | 42 | ✅ Passed |
+| `Phase7OwaspSecurityStandardTest` | OWASP Headers, Progressive Lockouts, Sanitization, Error Redaction | 61 | ✅ Passed |
+| `Phase8AntiDestructionAndAccountingSafeguardsTest` | Cascade Delete Guards, Return Idempotency, Negative Stock Invariant | 32 | ✅ Passed |
+| `Phase9CrudMatrixAndVariantAlignmentTest` | Standalone Attribute Values, Fitment Updates, RTV Lifecycle, Transfer Variants | 62 | ✅ Passed |
+| `Phase10EnterpriseScaleAndPartialGrnTest` | Multi-Branch BOLA Defense, Partial GRN Engine, Report Cache, SoftDeletes | 60 | ✅ Passed |
 
 ---
 
 ## 🤖 AI Agent MCP Server & Instant CLI Tool
 
-This repository includes a native **Model Context Protocol (MCP)** server under `~/.gemini/antigravity/mcp/laravel-pos/` enabling AI agents and developers to test features instantaneously:
+This repository includes a native **Model Context Protocol (MCP)** server enabling AI agents and developers to test features instantaneously:
 
 ```bash
 # 1. Query stock and variants
@@ -345,7 +325,7 @@ docker-compose exec app php artisan migrate:fresh --seed
 * **Email:** [khant20lin061@gmail.com](mailto:khant20lin061@gmail.com)
 * **WhatsApp / Phone:** `+65 652 231 668`
 * **Telegram:** `@khantlin0000`
-* **Viber Reference:** `09778574747` (Targeting Enrich Insights Consulting Services Co., Ltd / Tech Mart MM)
+* **Viber Reference:** `09778574747`
 
 ---
 
