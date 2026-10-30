@@ -45,7 +45,16 @@ class StaffUser extends Authenticatable
 
     public function hasPermission(string $module, string $action): bool
     {
-        $permissions = $this->role?->permissions ?? [];
+        if (! $this->role_id) {
+            return false;
+        }
+
+        $permissions = \Illuminate\Support\Facades\Cache::remember(
+            "role:perms:{$this->role_id}",
+            3600,
+            fn () => $this->role?->permissions ?? []
+        );
+
         return (bool) ($permissions[$module][$action] ?? false);
     }
 }

@@ -8,6 +8,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Phase B Implementation: Roles & Staff Management CRUD API:**
+  - **Permission Catalog Service (`PermissionCatalogService`):** Exposes canonical system permissions catalog matching Next.js UI structure (`pos`, `inventory`, `workshop`, `finances`, `purchases`, `settings`) with human labels (EN & MM), icons, and danger flags.
+  - **Redis Permission Caching (`StaffUser::hasPermission`):** Optimized authorization checks using `Cache::remember("role:perms:{$roleId}")` to eliminate redundant database JSON column parsing on high-traffic API requests.
+  - **Role Management Domain Actions:**
+    - `CreateRoleAction`: Dynamic role creation with custom permissions, badge colors, and audit trail.
+    - `UpdateRoleAction`: Role mutation, cache invalidation, and protection against renaming system roles (`ADMIN`).
+    - `DeleteRoleAction`: Role deletion safeguards protecting system roles and rejecting deletion if staff are actively assigned.
+  - **Staff Management Domain Actions:**
+    - `CreateStaffUserAction`: Staff registration with 4-6 digit numeric PIN hashing (`pin_hash`), secure password hashing, and workstation assignment.
+    - `UpdateStaffUserAction`: Profile updates, role reassignment, and PIN updating.
+    - `UpdateStaffStatusAction`: Account status transitions (`Active`, `Suspended`, `On Leave`) with instant zero-trust Sanctum token revocation upon suspension.
+    - `DeleteStaffUserAction`: Account deletion with self-deletion protection.
+  - **API Layer:**
+    - FormRequests: `CreateRoleRequest`, `UpdateRoleRequest`, `CreateStaffUserRequest`, `UpdateStaffUserRequest`, `UpdateStaffStatusRequest`.
+    - JsonResources: `RoleResource` (with active staff counts) and enhanced `StaffUserResource`.
+    - RESTful Controllers: `RoleController` (6 routes) and `StaffUserController` (6 routes) protected with `permission:settings,manageRoles`.
+  - **Pest Automated Feature Test Suite (`tests/Feature/RolesAndStaffManagementTest.php`):**
+    - 10 comprehensive tests covering permissions catalog, role creation, update, system role protection, staff deletion rejection, PIN hashing, status change token revocation, self-deletion defense, and RBAC guards.
+    - Total test suite status: **59 passed (274 assertions) — 100% pass rate in 3.61s**.
+
 - **Phase A Implementation: Enterprise Sales Return & Refund Module:**
   - **Database Migrations (`sales_returns` & `sales_return_items`):** Relational master and line-item tables with strict foreign keys to `sales_orders`, `customers`, `staff_users`, and `products`.
   - **Domain Models & Relationships (`SalesReturn`, `SalesReturnItem`):** Fully typed Eloquent models with relations to `SalesOrder`, `Customer`, `StaffUser`, and `Product`.

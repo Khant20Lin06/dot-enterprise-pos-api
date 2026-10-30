@@ -5,7 +5,9 @@ use App\Http\Controllers\Api\V1\CustomerCreditController;
 use App\Http\Controllers\Api\V1\PosController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ReportController;
+use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\SalesReturnController;
+use App\Http\Controllers\Api\V1\StaffUserController;
 use App\Http\Controllers\Api\V1\WorkOrderController;
 use Illuminate\Support\Facades\Route;
 
@@ -84,6 +86,33 @@ Route::prefix('v1')->group(function () {
         Route::prefix('reports')->group(function () {
             Route::get('/daily-summary', [ReportController::class, 'dailySummary'])
                 ->middleware('permission:finances,view');
+        });
+
+        // Roles & Permissions Management (Restricted to settings.manageRoles)
+        Route::prefix('roles')->group(function () {
+            Route::get('/permissions-catalog', [RoleController::class, 'permissionsCatalog']);
+            Route::get('/', [RoleController::class, 'index']);
+            Route::post('/', [RoleController::class, 'store'])
+                ->middleware('permission:settings,manageRoles');
+            Route::get('/{id}', [RoleController::class, 'show']);
+            Route::put('/{id}', [RoleController::class, 'update'])
+                ->middleware('permission:settings,manageRoles');
+            Route::delete('/{id}', [RoleController::class, 'destroy'])
+                ->middleware('permission:settings,manageRoles');
+        });
+
+        // Staff Users Management (Restricted to settings.manageRoles)
+        Route::prefix('staff')->group(function () {
+            Route::get('/', [StaffUserController::class, 'index']);
+            Route::post('/', [StaffUserController::class, 'store'])
+                ->middleware('permission:settings,manageRoles');
+            Route::get('/{id}', [StaffUserController::class, 'show']);
+            Route::put('/{id}', [StaffUserController::class, 'update'])
+                ->middleware('permission:settings,manageRoles');
+            Route::patch('/{id}/status', [StaffUserController::class, 'updateStatus'])
+                ->middleware('permission:settings,manageRoles');
+            Route::delete('/{id}', [StaffUserController::class, 'destroy'])
+                ->middleware('permission:settings,manageRoles');
         });
     });
 });

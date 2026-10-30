@@ -22,6 +22,7 @@
 | **Audit I** | Red-Team Concurrency & Security Hardening (`RED_TEAM_ENTERPRISE_AUDIT.md`) | 🟢 Completed | 100% |
 | **Audit II** | Forensic Enterprise Module Gap Audit (`ENTERPRISE_MODULES_GAP_AUDIT.md`) | 🟢 Completed | 100% |
 | **Phase A** | Enterprise Sales Return & Refund Module (Migration, Action, API, Reverb) | 🟢 Completed | 100% |
+| **Phase B** | Roles & Staff Management CRUD API (RoleController, StaffController, Redis Cache) | 🟢 Completed | 100% |
 
 ---
 

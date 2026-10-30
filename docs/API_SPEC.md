@@ -345,3 +345,86 @@
   }
 }
 ```
+
+---
+
+## 6. Roles & Permissions Management API
+
+### 6.1. Get Permissions Canonical Catalog
+* **Endpoint:** `GET /roles/permissions-catalog`
+* **Response (200 OK):** Exposes modules (`pos`, `inventory`, `workshop`, `finances`, `purchases`, `settings`), human labels (EN & MM), icons, and danger flags.
+
+### 6.2. List All Roles
+* **Endpoint:** `GET /roles`
+* **Response (200 OK):** List of all roles with granular permission dictionaries and `staffCount`.
+
+### 6.3. Create Custom Role
+* **Endpoint:** `POST /roles`
+* **Authorization:** `Bearer <token>` (`settings.manageRoles`)
+* **Request Body:**
+```json
+{
+  "code": "WAREHOUSE_SUPERVISOR",
+  "name": "Warehouse Supervisor",
+  "badge_color": "#10b981",
+  "description": "Oversees inventory transfers and stock adjustments",
+  "permissions": {
+    "inventory": { "view": true, "create": true, "edit": true, "adjustStock": true },
+    "purchases": { "view": true, "create": true, "approvePO": true }
+  }
+}
+```
+
+### 6.4. Update Role & Invalidate Cache
+* **Endpoint:** `PUT /roles/{id}`
+* **Authorization:** `Bearer <token>` (`settings.manageRoles`)
+
+### 6.5. Delete Custom Role
+* **Endpoint:** `DELETE /roles/{id}`
+* **Authorization:** `Bearer <token>` (`settings.manageRoles`)
+* **Note:** Rejects deletion of system roles or roles with actively assigned staff.
+
+---
+
+## 7. Staff Users Management API
+
+### 7.1. List Staff Users
+* **Endpoint:** `GET /staff?role_id=2&status=Active`
+* **Response (200 OK):** Paginated staff user records with assigned role, status, and workstation.
+
+### 7.2. Register New Staff User
+* **Endpoint:** `POST /staff`
+* **Authorization:** `Bearer <token>` (`settings.manageRoles`)
+* **Request Body:**
+```json
+{
+  "name": "Ko Zaw Zaw",
+  "email": "zawzaw@dotpos.com",
+  "phone": "09987654321",
+  "role_id": 2,
+  "pin": "7788",
+  "password": "SecurePassword123!",
+  "workstation": "POS Counter 02",
+  "status": "Active"
+}
+```
+
+### 7.3. Update Staff Details / Change PIN
+* **Endpoint:** `PUT /staff/{id}`
+* **Authorization:** `Bearer <token>` (`settings.manageRoles`)
+
+### 7.4. Change Staff Status & Instant Token Revocation
+* **Endpoint:** `PATCH /staff/{id}/status`
+* **Authorization:** `Bearer <token>` (`settings.manageRoles`)
+* **Request Body:**
+```json
+{
+  "status": "Suspended"
+}
+```
+* **Security:** If status is set to `Suspended`, all active Sanctum tokens are immediately purged.
+
+### 7.5. Delete Staff Account
+* **Endpoint:** `DELETE /staff/{id}`
+* **Authorization:** `Bearer <token>` (`settings.manageRoles`)
+* **Note:** Self-deletion by the authenticated user is strictly blocked.
