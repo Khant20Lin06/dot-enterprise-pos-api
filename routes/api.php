@@ -19,10 +19,10 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::prefix('v1')->group(function () {
-    // Public Authentication Endpoints
+    // Public Authentication Endpoints (Hardened with IP Throttling)
     Route::prefix('auth')->group(function () {
-        Route::post('/login', [AuthController::class, 'login']);
-        Route::post('/verify-pin', [AuthController::class, 'verifyPin']);
+        Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+        Route::post('/verify-pin', [AuthController::class, 'verifyPin'])->middleware('throttle:10,1');
     });
 
     // Protected Endpoints (Requires Sanctum Bearer Token)
@@ -58,20 +58,23 @@ Route::prefix('v1')->group(function () {
             Route::get('/work-orders', [WorkOrderController::class, 'index']);
             Route::post('/work-orders', [WorkOrderController::class, 'store']);
             Route::get('/work-orders/{id}', [WorkOrderController::class, 'show']);
-            Route::post('/work-orders/{id}/convert-to-invoice', [WorkOrderController::class, 'convertToInvoice']);
+            Route::post('/work-orders/{id}/convert-to-invoice', [WorkOrderController::class, 'convertToInvoice'])
+                ->middleware('permission:workshop,approveJobCard');
         });
 
         // Customers & Credit Ledger
         Route::prefix('customers')->group(function () {
             Route::get('/', [CustomerCreditController::class, 'index']);
             Route::get('/{id}', [CustomerCreditController::class, 'show']);
-            Route::post('/{id}/settle-credit', [CustomerCreditController::class, 'settleCredit']);
+            Route::post('/{id}/settle-credit', [CustomerCreditController::class, 'settleCredit'])
+                ->middleware('permission:finances,approveCreditLimit');
             Route::get('/{id}/ledger', [CustomerCreditController::class, 'ledger']);
         });
 
-        // Executive Reports & Analytics
+        // Executive Reports & Analytics (Restricted to Finance/Admin)
         Route::prefix('reports')->group(function () {
-            Route::get('/daily-summary', [ReportController::class, 'dailySummary']);
+            Route::get('/daily-summary', [ReportController::class, 'dailySummary'])
+                ->middleware('permission:finances,view');
         });
     });
 });

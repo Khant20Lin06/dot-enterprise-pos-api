@@ -49,7 +49,7 @@ class WorkOrderController extends Controller
         $validated = $request->validated();
 
         $advisorId = $validated['service_advisor_id'] ?? ($request->user()?->id ?? 1);
-        $jobCardNo = 'JC-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -4));
+        $jobCardNo = app(\App\Services\AtomicSequenceService::class)->getNextSequence('JC');
 
         $workOrder = DB::transaction(function () use ($validated, $advisorId, $jobCardNo) {
             $partsTotal = 0.00;

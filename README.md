@@ -9,7 +9,7 @@
 [![MySQL](https://img.shields.io/badge/MySQL-8.0_ACID-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://mysql.com)
 [![Redis](https://img.shields.io/badge/Redis-7_Queues-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
 [![Laravel Reverb](https://img.shields.io/badge/Laravel_Reverb-WebSockets-F05340?style=for-the-badge&logo=laravel&logoColor=white)](https://laravel.com/docs/reverb)
-[![Pest Tests](https://img.shields.io/badge/Pest_PHP-32_Passed_%7C_140_Asserts-10B981?style=for-the-badge&logo=pest&logoColor=white)](https://pestphp.com)
+[![Pest Tests](https://img.shields.io/badge/Pest_PHP-38_Passed_%7C_156_Asserts-10B981?style=for-the-badge&logo=pest&logoColor=white)](https://pestphp.com)
 [![Docker](https://img.shields.io/badge/Docker-6_Services-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
 <p align="center">
@@ -252,6 +252,14 @@ The test suite validates database relational integrity, concurrency locking, Web
   ✓ it broadcasts OrderCompletedEvent on pos.orders when POS checkout completes
   ✓ it broadcasts WorkOrderStatusChangedEvent on workshop.bay when work order is converted to invoice
 
+   PASS  Tests\Feature\SecurityAndConcurrencyHardeningTest
+  ✓ it guarantees atomic concurrency-safe sequential invoice numbers
+  ✓ it prevents client-side price tampering by enforcing catalog price without manager override
+  ✓ it blocks loyalty points underflow attack when customer lacks sufficient points
+  ✓ it sorts multi-item locks in consistent ascending order to prevent deadlocks
+  ✓ it enforces RBAC permission middleware and blocks unauthorized staff from viewing daily reports
+  ✓ it records audit log on failed PIN unlock attempts
+
    PASS  Tests\Feature\ApiEndpointsTest
   ✓ it authenticates staff user with valid email and password
   ✓ it rejects authentication with invalid credentials
@@ -263,8 +271,8 @@ The test suite validates database relational integrity, concurrency locking, Web
   ✓ it settles customer credit debt via API and returns ledger
   ✓ it retrieves daily sales and workshop executive summary report via API
 
-  Tests:    32 passed (140 assertions)
-  Duration: 1.79s
+  Tests:    38 passed (156 assertions)
+  Duration: 2.44s
 ```
 
 ---

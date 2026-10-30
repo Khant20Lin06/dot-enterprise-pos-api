@@ -63,21 +63,48 @@ class AuthController extends Controller
     }
 
     /**
-     * Rapid cashier terminal unlock and switch via 4-digit PIN.
+     * Rapid cashier terminal unlock and switch via 4-digit PIN (Hardened against CPU DoS).
      */
     public function verifyPin(VerifyPinRequest $request): JsonResponse
     {
-        $staffUsers = StaffUser::with('role')->where('status', 'Active')->get();
-
         $matchedStaff = null;
-        foreach ($staffUsers as $staff) {
-            if ($staff->pin_hash && Hash::check($request->pin, $staff->pin_hash)) {
+
+        // Optimized O(1) lookup if staff identifier is provided
+        if ($request->filled('staff_id')) {
+            $staff = StaffUser::with('role')->where('status', 'Active')->find($request->staff_id);
+            if ($staff && $staff->pin_hash && Hash::check($request->pin, $staff->pin_hash)) {
                 $matchedStaff = $staff;
-                break;
+            }
+        } elseif ($request->filled('email')) {
+            $staff = StaffUser::with('role')->where('status', 'Active')->where('email', $request->email)->first();
+            if ($staff && $staff->pin_hash && Hash::check($request->pin, $staff->pin_hash)) {
+                $matchedStaff = $staff;
+            }
+        } else {
+            // Limited candidate pool of active staff members
+            $candidates = StaffUser::with('role')->where('status', 'Active')->limit(20)->get();
+
+            foreach ($candidates as $staff) {
+                if ($staff->pin_hash && Hash::check($request->pin, $staff->pin_hash)) {
+                    $matchedStaff = $staff;
+                    break;
+                }
             }
         }
 
         if (! $matchedStaff) {
+            AuditLog::create([
+                'staff_id' => $request->staff_id ?? null,
+                'module' => 'security',
+                'action' => 'pin_unlock_failed',
+                'severity' => 'warning',
+                'resource_type' => 'staff_users',
+                'resource_id' => 0,
+                'description' => "Failed PIN unlock attempt at workstation {$request->workstation} from IP {$request->ip()}",
+                'ip_address' => $request->ip(),
+                'created_at' => now(),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid security PIN code.',

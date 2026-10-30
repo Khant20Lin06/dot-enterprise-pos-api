@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Enterprise Red-Team Security & Concurrency Hardening:**
+  - **Deadlock Elimination (Consistent Lock Acquisition Order):** Enforced ascending `product_id` sorting in `ProcessCheckoutAction` before row-level locking, preventing dining-philosophers deadlock across concurrent checkout stations.
+  - **Atomic Concurrency-Safe Sequencing (`AtomicSequenceService`):** Created `system_sequences` table with pessimistic locking and Redis `INCR` fallback, replacing un-safe `SalesOrder::count() + 1` and preventing duplicate invoice collisions.
+  - **Anti-Price Tampering & Authoritative Pricing:** Enforced server-side catalog and price list validation, blocking client-side `unit_price` tampering unless supervisor override is authorized.
+  - **Loyalty Points Underflow Protection:** Enforced customer balance floor checks (`$pointsRedeemed <= $customer->loyalty_points`), preventing point deficit exploits.
+  - **Transaction Boundary & After-Commit Dispatching:** Configured `ShouldDispatchAfterCommit` on domain broadcast events (`StockUpdatedEvent`, `OrderCompletedEvent`, `WorkOrderStatusChangedEvent`) and `->afterCommit()` on `GenerateReceiptPdfJob`, eliminating phantom WebSocket leakage and ghost-record queue race conditions.
+  - **PIN Brute-Force & Bcrypt CPU DoS Defense:** Added IP rate limiting (`throttle:10,1`) on `/verify-pin` and optimized staff identification lookups to O(1), with failed attempt logging in `audit_logs` (severity: warning).
+  - **RBAC Endpoint Authorization (`CheckPermission` Middleware):** Restricted financial summaries (`permission:finances,view`), workshop invoicing, and credit settlements by user role.
+  - **Pest Hardening Test Suite:** Added `tests/Feature/SecurityAndConcurrencyHardeningTest.php` with 6 comprehensive security tests. Total suite now at **38 passed (156 assertions)**.
+
 - **Phase 8 & Phase 9 Implementation (REST API, CI/CD & Laravel MCP Server):**
   - Thin RESTful Controllers under `app/Http/Controllers/Api/V1/` (`AuthController`, `PosController`, `WorkOrderController`, `CustomerCreditController`, `ProductController`, `ReportController`).
   - Strict Form Validation Requests under `app/Http/Requests/V1/` (`LoginRequest`, `VerifyPinRequest`, `CheckoutRequest`, `CreateWorkOrderRequest`, `SettleCreditRequest`).

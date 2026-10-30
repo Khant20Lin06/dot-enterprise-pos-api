@@ -28,8 +28,8 @@ class SettleCustomerCreditAction
             // 3. Deduct Due Balance
             $customer->decrement('due_amount', $settleAmount);
 
-            // 4. Generate Sequential Receipt Number
-            $receiptNo = 'REC-' . now()->format('Ymd') . '-' . str_pad((string) (CreditSettlement::count() + 1), 4, '0', STR_PAD_LEFT);
+            // 4. Generate Atomic Sequential Receipt Number (Concurrency-Safe)
+            $receiptNo = app(\App\Services\AtomicSequenceService::class)->getNextSequence('REC');
 
             // 5. Create Settlement Record
             return CreditSettlement::create([

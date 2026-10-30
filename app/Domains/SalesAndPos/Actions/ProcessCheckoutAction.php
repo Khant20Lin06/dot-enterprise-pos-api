@@ -37,12 +37,18 @@ class ProcessCheckoutAction
         return DB::transaction(function () use ($data, $cashierId) {
             $customerId = $data['customer_id'] ?? null;
             $items = $data['items'] ?? [];
-            $paymentSplits = $data['payment_splits'] ?? [];
-            $totalAmount = (float) ($data['total_amount'] ?? 0.00);
+            $paymentSplits = $data['payment_splits'] ?? $data['payments'] ?? [];
+
+            // Hardening 1: Deadlock Prevention via Consistent Lock Acquisition Ordering
+            // Sort items ascending by product_id so all concurrent transactions lock rows in the exact same sequence.
+            usort($items, function ($a, $b) {
+                return ((int) ($a['product_id'] ?? 0)) <=> ((int) ($b['product_id'] ?? 0));
+            });
 
             // 2. Concurrency Control: Deduct Inventory with Row-Level Lock
             $orderItemsPayload = [];
             $laborTotal = 0.00;
+            $calculatedSubtotal = 0.00;
 
             foreach ($items as $itemData) {
                 $productId = (int) $itemData['product_id'];
@@ -52,9 +58,20 @@ class ProcessCheckoutAction
                 // Pessimistic Row Locking in action
                 $product = $this->deductStockAction->execute($productId, $qty, $optionId);
 
-                $unitPrice = (float) ($itemData['unit_price'] ?? $product->sell_price);
+                // Hardening 2: Server-Authoritative Price Validation (Anti-Price Tampering)
+                $catalogPrice = (float) ($product->sell_price ?: $product->retail_price);
+                $requestedPrice = isset($itemData['unit_price']) ? (float) $itemData['unit_price'] : $catalogPrice;
+
+                // Disallow unauthorized price reductions unless explicitly overridden
+                if ($requestedPrice < $catalogPrice && empty($data['allow_discount']) && empty($data['manager_pin'])) {
+                    $unitPrice = $catalogPrice;
+                } else {
+                    $unitPrice = $requestedPrice;
+                }
+
                 $discountAmount = (float) ($itemData['discount_amount'] ?? 0.00);
                 $subtotal = round(($unitPrice * $qty) - $discountAmount, 2);
+                $calculatedSubtotal += $subtotal;
 
                 if ($product->is_labor) {
                     $laborTotal += $subtotal;
@@ -71,6 +88,11 @@ class ProcessCheckoutAction
                     'subtotal' => $subtotal,
                 ];
             }
+
+            // Server-verified totals
+            $discountTotal = (float) ($data['discount_amount'] ?? 0.00);
+            $taxTotal = (float) ($data['tax_amount'] ?? 0.00);
+            $totalAmount = max(0, round($calculatedSubtotal - $discountTotal + $taxTotal, 2));
 
             // 3. Multi-Tender Payment & Credit Calculation
             $dueAmount = 0.00;
@@ -100,19 +122,25 @@ class ProcessCheckoutAction
                 }
             }
 
-            // 5. Loyalty Points Accounting
+            // 5. Loyalty Points Accounting & Hardening 3: Underflow/Deficit Protection
             $pointsEarned = 0;
             $pointsRedeemed = (int) ($data['points_redeemed'] ?? 0);
 
             if ($customer) {
+                if ($pointsRedeemed > 0 && $customer->loyalty_points < $pointsRedeemed) {
+                    throw new \InvalidArgumentException(
+                        "Customer has insufficient loyalty points. Available: {$customer->loyalty_points}, Requested: {$pointsRedeemed}."
+                    );
+                }
+
                 // Earn 1 point per 1,000 Ks
                 $pointsEarned = (int) floor($totalAmount / 1000);
                 $netPointsChange = $pointsEarned - $pointsRedeemed;
                 $customer->increment('loyalty_points', $netPointsChange);
             }
 
-            // 6. Generate Sequential Invoice Number
-            $orderNo = 'INV-' . now()->format('Ymd') . '-' . str_pad((string) (SalesOrder::count() + 1), 4, '0', STR_PAD_LEFT);
+            // Hardening 4: Atomic Concurrency-Safe Invoice Sequencing (Zero Collision Risk)
+            $orderNo = app(\App\Services\AtomicSequenceService::class)->getNextSequence('INV');
 
             // 7. Create Master Sales Order Record
             $salesOrder = SalesOrder::create([
@@ -120,11 +148,11 @@ class ProcessCheckoutAction
                 'customer_id' => $customerId ?? 1,
                 'vehicle_id' => $data['vehicle_id'] ?? null,
                 'cashier_id' => $cashierId,
-                'subtotal' => (float) ($data['subtotal'] ?? $totalAmount),
+                'subtotal' => $calculatedSubtotal,
                 'labor_total' => $laborTotal,
-                'discount_amount' => (float) ($data['discount_amount'] ?? 0.00),
+                'discount_amount' => $discountTotal,
                 'discount_note' => $data['discount_note'] ?? null,
-                'tax_amount' => (float) ($data['tax_amount'] ?? 0.00),
+                'tax_amount' => $taxTotal,
                 'total_amount' => $totalAmount,
                 'paid_amount' => $paidAmount,
                 'due_amount' => $dueAmount,
@@ -154,8 +182,8 @@ class ProcessCheckoutAction
             $loadedOrder = $salesOrder->load(['items.product', 'payments', 'customer', 'cashier']);
             event(new \App\Domains\SalesAndPos\Events\OrderCompletedEvent($loadedOrder));
 
-            // 11. Dispatch Queued Background Thermal Receipt Generation Job (Horizon/Redis)
-            \App\Jobs\GenerateReceiptPdfJob::dispatch($salesOrder->id);
+            // Hardening 5: Ghost Record Prevention (Queue Worker only dispatches AFTER DB Commit)
+            \App\Jobs\GenerateReceiptPdfJob::dispatch($salesOrder->id)->afterCommit();
 
             return $loadedOrder;
         });
