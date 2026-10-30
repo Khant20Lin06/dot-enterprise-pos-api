@@ -36,6 +36,11 @@ class Customer extends Model
         'next_service_due_date' => 'date',
     ];
 
+    public function getCurrentDueAttribute()
+    {
+        return $this->attributes['due_amount'] ?? 0;
+    }
+
     public function fleet(): BelongsTo
     {
         return $this->belongsTo(Fleet::class, 'fleet_id');

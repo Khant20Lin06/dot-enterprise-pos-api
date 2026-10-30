@@ -51,6 +51,21 @@ class Product extends Model
         return $this->belongsTo(UnitOfMeasure::class, 'uom_id');
     }
 
+    public function unitOfMeasure(): BelongsTo
+    {
+        return $this->belongsTo(UnitOfMeasure::class, 'uom_id');
+    }
+
+    public function getRetailPriceAttribute()
+    {
+        return $this->attributes['retail_price'] ?? $this->attributes['sell_price'] ?? 0;
+    }
+
+    public function getMinStockAlertAttribute()
+    {
+        return $this->attributes['min_stock_alert'] ?? $this->attributes['min_stock'] ?? 0;
+    }
+
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class, 'supplier_id');

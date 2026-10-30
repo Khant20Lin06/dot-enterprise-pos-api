@@ -56,6 +56,26 @@ class WorkOrder extends Model
         return $this->belongsTo(Mechanic::class, 'assigned_mechanic_id');
     }
 
+    public function primaryMechanic(): BelongsTo
+    {
+        return $this->belongsTo(Mechanic::class, 'assigned_mechanic_id');
+    }
+
+    public function serviceAdvisor(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\SecurityAndAudit\Models\StaffUser::class, 'service_advisor_id');
+    }
+
+    public function getLaborTotalAttribute()
+    {
+        return $this->attributes['labor_fee'] ?? 0;
+    }
+
+    public function getGrandTotalAttribute()
+    {
+        return $this->attributes['total_amount'] ?? (($this->attributes['parts_total'] ?? 0) + ($this->attributes['labor_fee'] ?? 0));
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(WorkOrderItem::class, 'work_order_id');

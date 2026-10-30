@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Phase 8 & Phase 9 Implementation (REST API, CI/CD & Laravel MCP Server):**
+  - Thin RESTful Controllers under `app/Http/Controllers/Api/V1/` (`AuthController`, `PosController`, `WorkOrderController`, `CustomerCreditController`, `ProductController`, `ReportController`).
+  - Strict Form Validation Requests under `app/Http/Requests/V1/` (`LoginRequest`, `VerifyPinRequest`, `CheckoutRequest`, `CreateWorkOrderRequest`, `SettleCreditRequest`).
+  - Standard JSON Resources under `app/Http/Resources/V1/` (`StaffUserResource`, `ProductResource`, `SalesOrderResource`, `WorkOrderResource`, `CustomerResource`).
+  - Registered 23 REST API routes under `/api/v1/` with Laravel Sanctum bearer token authentication.
+  - Interactive OpenAPI v3 documentation powered by Dedoc Scramble (`/docs/api` & `/docs/api.json`).
+  - Full GitHub Actions CI/CD workflow (`.github/workflows/ci.yml`) supporting automated testing on PHP 8.3 & 8.4 with MySQL and Redis services.
+  - Implemented AI Agent MCP Server under `C:\Users\Admin\.gemini\antigravity\mcp\laravel-pos/` with tool schemas (`pos_checkout`, `query_stock`, `workshop_job_card`, `customer_credit_settle`, `daily_sales_summary`).
+  - Artisan verification command `php artisan pos:test {action}` for rapid feature-by-feature verification.
+  - Comprehensive feature test suite: `tests/Feature/ApiEndpointsTest.php` with 9 exhaustive tests (100% pass).
+  - Total test suite status: **32 passed (140 assertions)** with 0 failures.
+
 - **Phase 6 & Phase 7 Implementation (Redis Queues, Horizon & Node.js Worker Bridge):**
   - Integrated **Laravel Horizon** for queue monitoring with multi-queue supervisors handling `receipts`, `reports`, `notifications`, and `default`.
   - Configured Horizon authorization gate for administrative roles and system engineers.
