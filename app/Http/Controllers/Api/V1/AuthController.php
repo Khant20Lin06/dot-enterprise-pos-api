@@ -10,6 +10,7 @@ use App\Http\Requests\V1\VerifyPinRequest;
 use App\Http\Resources\V1\StaffUserResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
@@ -19,14 +20,61 @@ class AuthController extends Controller
      */
     public function login(LoginRequest $request): JsonResponse
     {
+        $email = strtolower(trim($request->email));
+        $lockoutKey = "auth_lockout:{$email}";
+        $failKey = "auth_fail:{$email}";
+
+        // OWASP API2: Check progressive brute-force account lockout
+        if (Cache::has($lockoutKey)) {
+            $remaining = (int) Cache::get($lockoutKey) - now()->timestamp;
+            return response()->json([
+                'success' => false,
+                'message' => 'Account temporarily locked due to excessive failed login attempts. Please try again later.',
+                'error_code' => 'ACCOUNT_LOCKED',
+                'retry_after' => max(1, $remaining),
+            ], 429);
+        }
+
         $staff = StaffUser::with('role')->where('email', $request->email)->first();
 
         if (! $staff || ! Hash::check($request->password, $staff->password)) {
+            $attempts = (int) Cache::increment($failKey, 1);
+            if ($attempts === 1) {
+                Cache::put($failKey, 1, now()->addMinutes(15));
+            }
+
+            if ($attempts >= 5) {
+                Cache::put($lockoutKey, now()->addMinutes(15)->timestamp, now()->addMinutes(15));
+
+                AuditLog::create([
+                    'staff_id' => $staff?->id,
+                    'module' => 'security',
+                    'action' => 'account_locked_brute_force',
+                    'severity' => 'critical',
+                    'resource_type' => 'staff_users',
+                    'resource_id' => $staff?->id ?? 0,
+                    'description' => "Account {$email} locked after 5 consecutive failed login attempts from IP {$request->ip()}",
+                    'ip_address' => $request->ip(),
+                    'created_at' => now(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Account temporarily locked due to 5 consecutive failed login attempts. Please try again after 15 minutes.',
+                    'error_code' => 'ACCOUNT_LOCKED',
+                    'retry_after' => 900,
+                ], 429);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid email or password credentials.',
             ], 401);
         }
+
+        // Authentication successful: reset failure and lockout counters
+        Cache::forget($failKey);
+        Cache::forget($lockoutKey);
 
         if (strtolower($staff->status) !== 'active') {
             return response()->json([
@@ -66,10 +114,25 @@ class AuthController extends Controller
     }
 
     /**
-     * Rapid cashier terminal unlock and switch via 4-digit PIN (Hardened against CPU DoS).
+     * Rapid cashier terminal unlock and switch via 4-digit PIN (Hardened against CPU DoS & Brute-Force).
      */
     public function verifyPin(VerifyPinRequest $request): JsonResponse
     {
+        $ip = $request->ip();
+        $pinLockoutKey = "pin_lockout:{$ip}";
+        $pinFailKey = "pin_fail:{$ip}";
+
+        // OWASP API2: Check progressive brute-force terminal lockout
+        if (Cache::has($pinLockoutKey)) {
+            $remaining = (int) Cache::get($pinLockoutKey) - now()->timestamp;
+            return response()->json([
+                'success' => false,
+                'message' => 'Terminal PIN unlock temporarily locked due to excessive failed attempts. Please try again later.',
+                'error_code' => 'TERMINAL_LOCKED',
+                'retry_after' => max(1, $remaining),
+            ], 429);
+        }
+
         $matchedStaff = null;
 
         // Optimized O(1) lookup if staff identifier is provided
@@ -96,6 +159,11 @@ class AuthController extends Controller
         }
 
         if (! $matchedStaff) {
+            $attempts = (int) Cache::increment($pinFailKey, 1);
+            if ($attempts === 1) {
+                Cache::put($pinFailKey, 1, now()->addMinutes(15));
+            }
+
             AuditLog::create([
                 'staff_id' => $request->staff_id ?? null,
                 'module' => 'security',
@@ -108,11 +176,38 @@ class AuthController extends Controller
                 'created_at' => now(),
             ]);
 
+            if ($attempts >= 5) {
+                Cache::put($pinLockoutKey, now()->addMinutes(15)->timestamp, now()->addMinutes(15));
+
+                AuditLog::create([
+                    'staff_id' => $request->staff_id ?? null,
+                    'module' => 'security',
+                    'action' => 'terminal_locked_brute_force',
+                    'severity' => 'critical',
+                    'resource_type' => 'pos_terminal',
+                    'resource_id' => 0,
+                    'description' => "Terminal locked after 5 consecutive failed PIN unlock attempts from IP {$request->ip()}",
+                    'ip_address' => $request->ip(),
+                    'created_at' => now(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Terminal PIN unlock temporarily locked due to 5 consecutive failed attempts. Please try again after 15 minutes.',
+                    'error_code' => 'TERMINAL_LOCKED',
+                    'retry_after' => 900,
+                ], 429);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid security PIN code.',
             ], 401);
         }
+
+        // Terminal unlock successful: reset failure and lockout counters
+        Cache::forget($pinFailKey);
+        Cache::forget($pinLockoutKey);
 
         $workstation = $request->workstation ?? $matchedStaff->workstation ?? 'POS-Counter';
         $matchedStaff->update([

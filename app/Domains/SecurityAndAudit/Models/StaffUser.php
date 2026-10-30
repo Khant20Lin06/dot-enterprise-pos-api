@@ -27,6 +27,7 @@ class StaffUser extends Authenticatable
     protected $hidden = [
         'password',
         'pin_hash',
+        'remember_token',
     ];
 
     protected $casts = [

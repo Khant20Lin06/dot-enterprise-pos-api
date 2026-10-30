@@ -35,6 +35,7 @@
 | **Phase L** | Forensic Remediation Stage 1: Anti-Fraud, Shift Enforcement & Cash Integrity Hotfixes | 🟢 Completed | 100% |
 | **Phase M** | Forensic Remediation Stage 2: Concurrency, Deadlocks & Inventory Integrity Hardening | 🟢 Completed | 100% |
 | **Phase N** | Forensic Remediation Stage 3: Operational CRUD Completeness & Missing Enterprise Features | 🟢 Completed | 100% |
+| **Phase O** | OWASP Top 10 API Security & ASVS Standard Implementation (Headers, XSS Disarm, Progressive Lockout, Error Sanitization) | 🟢 Completed | 100% |
 
 ---
 
@@ -448,3 +449,26 @@
 - [x] **Pest Feature Test Suite:**
   - `tests/Feature/Phase6OperationalCrudCompletenessTest.php`: 4 passed (96 assertions).
   - Full Test Suite: **146 passed (813 assertions) — 100% pass rate in 8.34s**.
+
+---
+
+### Phase O: OWASP Top 10 API Security & ASVS Implementation
+- [x] **OWASP Security Response Headers Enforcement (ASVS 14.4 & API8):**
+  - Created `EnforceSecurityHeaders` middleware attached to global HTTP pipeline.
+  - Enforces `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection: 0`, `Referrer-Policy: strict-origin-when-cross-origin`, pure REST `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; sandbox`, hardware-restricting `Permissions-Policy`, and financial/PII `Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private`.
+- [x] **OWASP CORS Policy Hardening (API8):**
+  - Created `config/cors.php` eliminating wildcards (`*`) and binding allowed origins strictly to configurable frontend domains (`CORS_ALLOWED_ORIGINS`).
+- [x] **OWASP Stored XSS & Script Injection Neutralization (ASVS 5.1 & API3):**
+  - Created `SanitizeInput` middleware recursively stripping `<script>`, `<iframe>`, `javascript:`, inline event handlers (`onerror=`, `onload=`) while preserving UTF-8 / Myanmar Unicode characters.
+- [x] **OWASP API2: Broken Authentication & Progressive Brute-Force Lockout:**
+  - Implemented 5-attempt progressive lockout for staff password logins and POS terminal PIN verification with 15-minute lockout windows.
+  - Generates `critical` severity `AuditLog` records (`account_locked_brute_force`, `terminal_locked_brute_force`) and returns `429 Too Many Requests` with `retry_after`.
+  - Resets attempt counters upon successful authentication.
+- [x] **OWASP API8 / CWE-209: Information Exposure Defense via Sanitized Error Payloads:**
+  - Configured standardized JSON error responses in `bootstrap/app.php` for `AuthenticationException` (401), `AuthorizationException` (403), `NotFoundHttpException` (404), `MethodNotAllowedHttpException` (405), and `TooManyRequestsHttpException` (429), eliminating stack trace and sensitive server information leakage.
+- [x] **OWASP API3: Broken Object Property Level Authorization & Data Redaction:**
+  - Added `remember_token` to `StaffUser::$hidden`.
+  - Created `SensitiveDataMasker` service redacting confidential fields (`password`, `pin`, `pin_hash`, `token`, `secret`, `webhook_secret`, `card_number`) in audit logs and serialization.
+- [x] **Pest Feature Test Suite:**
+  - `tests/Feature/Phase7OwaspSecurityStandardTest.php`: 6 passed (61 assertions).
+  - Full Test Suite: **152 passed (874 assertions) — 100% pass rate in 10.68s**.

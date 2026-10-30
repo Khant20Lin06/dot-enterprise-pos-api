@@ -1406,3 +1406,47 @@
   * Request Body: `{"sku": "VAR-001", "barcode": "BAR-001", "price": 45000, "cost_price": 30000, "stock": 10, "is_active": true}`
 * **Delete Variant:** `DELETE /products/{id}/variants/{variantId}`
   * **Physical Stock Safeguard:** Rejects deletion with `422 Unprocessable Entity` if variant has remaining physical stock (`stock > 0`). Automatically marks parent `product.has_variants = false` if the last remaining variant is deleted.
+
+---
+
+## 14. OWASP API Security Architecture & Standards
+
+### 14.1. Security Response Headers (EnforceSecurityHeaders Middleware)
+Every response emitted by the API includes hardened OWASP ASVS v4.0 response headers:
+* `X-Content-Type-Options: nosniff` — Prevents MIME confusion/sniffing attacks.
+* `X-Frame-Options: DENY` — Eliminates Clickjacking risk in iframes and embedded views.
+* `X-XSS-Protection: 0` — Modern standard disabling buggy legacy browser XSS filters.
+* `Referrer-Policy: strict-origin-when-cross-origin` — Restricts cross-origin referrer leakage.
+* `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; sandbox` — Disallows execution of remote scripts or frame embedding.
+* `Permissions-Policy: accelerometer=(), autoplay=(), camera=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=()` — Revokes unneeded browser hardware access.
+* `Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private` — Prevents sensitive PII and financial transaction data from caching in intermediate proxies.
+* `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` — Enforces HTTPS in production.
+
+### 14.2. Stored XSS & Script Injection Neutralization (SanitizeInput Middleware)
+* All incoming string parameters (except encrypted credentials like `password` and `pin`) are recursively sanitized before reaching controllers or database transactions.
+* Dangerous tags (`<script>`, `<iframe>`, `javascript:`, inline event handlers like `onload=`, `onerror=`) are stripped while preserving genuine multi-language strings and Myanmar Unicode text.
+
+### 14.3. Progressive Brute-Force Authentication Lockout (OWASP API2)
+* **Login Endpoints:** `POST /auth/login` and `POST /auth/verify-pin`.
+* **Lockout Rules:**
+  * 1 to 4 failed attempts: Return `401 Unauthorized` with failure audit logging.
+  * 5th consecutive failure: Returns `429 Too Many Requests` and locks the account / terminal IP for 15 minutes (`retry_after: 900`).
+  * Triggers a `critical` severity `AuditLog` entry for immediate red-team security monitoring.
+* **Error Response (429):**
+```json
+{
+  "success": false,
+  "message": "Account temporarily locked due to 5 consecutive failed login attempts. Please try again after 15 minutes.",
+  "error_code": "ACCOUNT_LOCKED",
+  "retry_after": 900
+}
+```
+
+### 14.4. Standardized Sanitized Error Responses (CWE-209 Defense)
+All unhandled exceptions and HTTP error conditions return standardized JSON payloads:
+* **401 Unauthorized:** `{"success": false, "message": "Unauthenticated or session expired.", "error_code": "AUTH_REQUIRED"}`
+* **403 Forbidden:** `{"success": false, "message": "This action is unauthorized. Insufficient permissions.", "error_code": "FORBIDDEN"}`
+* **404 Not Found:** `{"success": false, "message": "Requested API route or resource not found.", "error_code": "NOT_FOUND"}`
+* **405 Method Not Allowed:** `{"success": false, "message": "HTTP method not allowed for this endpoint.", "error_code": "METHOD_NOT_ALLOWED"}`
+* **429 Rate Limit Exceeded:** `{"success": false, "message": "Too many requests. Rate limit exceeded.", "error_code": "RATE_LIMIT_EXCEEDED"}`
+* **500 Internal Error:** Suppresses database connection credentials, SQL query strings, and file paths.

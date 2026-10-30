@@ -8,6 +8,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **OWASP Top 10 API Security (2023) & ASVS Standards Implementation:**
+  - **EnforceSecurityHeaders Middleware (OWASP ASVS 14.4 & API8):**
+    - Enforces `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection: 0`, `Referrer-Policy: strict-origin-when-cross-origin`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; sandbox`, hardware-restricting `Permissions-Policy`, and financial/PII `Cache-Control: no-store, no-cache, must-revalidate, max-age=0, private`.
+  - **Restrictive CORS Configuration (OWASP API8: Security Misconfiguration):**
+    - Created `config/cors.php` eliminating wildcards (`*`) and binding allowed origins strictly to configurable frontend domains (`CORS_ALLOWED_ORIGINS`).
+  - **SanitizeInput Middleware (OWASP ASVS 5.1 & Stored XSS Prevention):**
+    - Strips `<script>`, `<iframe>`, `javascript:`, and inline event handlers (`onerror=`, `onload=`) recursively from string request inputs while preserving UTF-8 / Myanmar Unicode text.
+  - **Progressive Brute-Force Account & Terminal Lockout (OWASP API2: Broken Authentication):**
+    - `AuthController`: Implemented 5-attempt progressive lockout for staff password logins and POS terminal PIN verification with 15-minute lockout windows. Returns `429 Too Many Requests` with `retry_after` and logs `critical` severity audit logs.
+  - **Standardized Sanitized Error Responses (OWASP API8 / CWE-209 Information Exposure):**
+    - Configured standardized JSON error responses in `bootstrap/app.php` for `AuthenticationException` (401), `AuthorizationException` (403), `NotFoundHttpException` (404), `MethodNotAllowedHttpException` (405), and `TooManyRequestsHttpException` (429), suppressing stack traces and sensitive database/server internals.
+  - **Sensitive Data Redaction & Hidden Attributes (OWASP API3: Broken Object Property Level Authorization):**
+    - Added `remember_token` to `StaffUser::$hidden`.
+    - Created `SensitiveDataMasker` service to scrub passwords, PINs, tokens, and cryptographic signatures in audit logs and serialization.
+  - **Automated Pest Feature Test Suite:**
+    - Authored `tests/Feature/Phase7OwaspSecurityStandardTest.php`: 6 comprehensive feature tests covering security headers, XSS sanitization, password lockout, PIN lockout, sanitized error JSON, and credential redaction.
+    - Repository Test Suite: **152 passed (874 assertions) — 100% pass rate in 10.68s**.
 - **Forensic Remediation Stage 3: Operational CRUD Completeness & Missing Enterprise Features:**
   - **Enterprise Audit Logs API (CRUD-01):**
     - `AuditLogResource` & `AuditLogController`: Exposes `GET /api/v1/audit-logs` and `GET /api/v1/audit-logs/{id}` with multi-field filtering (`module`, `action`, `severity`, `staff_id`, `resource_type`, `date_from`, `date_to`, `search`) and pagination.
