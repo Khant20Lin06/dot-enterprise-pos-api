@@ -325,7 +325,6 @@ docker-compose exec app php artisan migrate:fresh --seed
 * **Email:** [khant20lin061@gmail.com](mailto:khant20lin061@gmail.com)
 * **WhatsApp / Phone:** `+65 652 231 668`
 * **Telegram:** `@khantlin0000`
-* **Viber Reference:** `09778574747`
 
 ---
 
