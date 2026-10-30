@@ -164,3 +164,87 @@ it('records audit log on failed PIN unlock attempts', function () {
     expect($auditLog)->not->toBeNull();
     expect($auditLog->severity)->toBe('warning');
 });
+
+it('blocks underpaid POS checkout transactions when tender allocation is deficient', function () {
+    $staff = StaffUser::first();
+    $customer = Customer::first();
+    $product = Product::where('is_labor', false)->first();
+
+    $action = app(ProcessCheckoutAction::class);
+
+    // Order requires full catalog price, but client tenders only 1,000 Ks
+    $deficientPayload = [
+        'cashier_id' => $staff->id,
+        'customer_id' => $customer->id,
+        'items' => [
+            ['product_id' => $product->id, 'qty' => 1],
+        ],
+        'payments' => [
+            ['method' => 'Cash', 'amount' => 1000.00],
+        ],
+    ];
+
+    expect(fn () => $action->execute($deficientPayload))->toThrow(\DomainException::class);
+});
+
+it('blocks Work Order intake when vehicle does not belong to the designated customer', function () {
+    $staff = StaffUser::first();
+    Sanctum::actingAs($staff);
+
+    $customer1 = Customer::first();
+    $customer2 = Customer::skip(1)->first() ?? Customer::create(['name' => 'Other Cust', 'phone' => '+95999999999']);
+
+    // Vehicle belongs to customer 2
+    $vehicle = \App\Domains\Workshop\Models\Vehicle::first();
+    $vehicle->update(['customer_id' => $customer2->id]);
+
+    $response = $this->postJson('/api/v1/workshop/work-orders', [
+        'customer_id' => $customer1->id, // Mismatched customer!
+        'vehicle_id' => $vehicle->id,
+        'complaint' => 'Suspicious cross-customer vehicle intake',
+    ]);
+
+    $response->assertStatus(422)
+        ->assertJson([
+            'success' => false,
+        ]);
+});
+
+it('blocks negative credit settlement amount to prevent debt inflation', function () {
+    $customer = Customer::first();
+    $customer->update(['due_amount' => 50000.00]);
+
+    $action = app(\App\Domains\CreditAndLedger\Actions\SettleCustomerCreditAction::class);
+
+    expect(fn () => $action->execute($customer->id, -25000.00, 'Cash'))->toThrow(\InvalidArgumentException::class);
+    expect((float) $customer->fresh()->due_amount)->toEqual(50000.00);
+});
+
+it('records an immutable financial transaction audit log on completed POS checkout', function () {
+    $staff = StaffUser::first();
+    $customer = Customer::first();
+    $product = Product::where('is_labor', false)->first();
+
+    $action = app(ProcessCheckoutAction::class);
+
+    $order = $action->execute([
+        'cashier_id' => $staff->id,
+        'customer_id' => $customer->id,
+        'items' => [
+            ['product_id' => $product->id, 'qty' => 1],
+        ],
+        'payments' => [
+            ['method' => 'Cash', 'amount' => (float) $product->retail_price],
+        ],
+    ]);
+
+    $log = AuditLog::where('module', 'sales_and_pos')
+        ->where('action', 'checkout_completed')
+        ->where('resource_id', $order->id)
+        ->latest('id')
+        ->first();
+
+    expect($log)->not->toBeNull();
+    expect($log->severity)->toBe('info');
+    expect($log->description)->toContain($order->order_no);
+});

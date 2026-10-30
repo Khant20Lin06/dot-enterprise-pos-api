@@ -18,6 +18,11 @@ class SettleCustomerCreditAction
         ?string $note = null,
         ?int $cashierId = null
     ): CreditSettlement {
+        // VULN-06 Hardening: Invariant assertion (Prevent negative debt inflation)
+        if ($amount <= 0) {
+            throw new \InvalidArgumentException("Settlement payment amount must be strictly greater than zero.");
+        }
+
         return DB::transaction(function () use ($customerId, $amount, $paymentMethod, $note, $cashierId) {
             // 1. Lock customer row to prevent concurrent balance race condition
             $customer = Customer::where('id', $customerId)->lockForUpdate()->firstOrFail();

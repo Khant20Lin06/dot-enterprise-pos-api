@@ -51,6 +51,18 @@ class WorkOrderController extends Controller
         $advisorId = $validated['service_advisor_id'] ?? ($request->user()?->id ?? 1);
         $jobCardNo = app(\App\Services\AtomicSequenceService::class)->getNextSequence('JC');
 
+        // VULN-05 Hardening: Validate Vehicle Ownership to prevent IDOR / cross-customer billing
+        $vehicle = \App\Domains\Workshop\Models\Vehicle::where('id', $validated['vehicle_id'])
+            ->where('customer_id', $validated['customer_id'])
+            ->first();
+
+        if (! $vehicle) {
+            return response()->json([
+                'success' => false,
+                'message' => "Relational Error: Vehicle ID {$validated['vehicle_id']} does not belong to Customer ID {$validated['customer_id']}.",
+            ], 422);
+        }
+
         $workOrder = DB::transaction(function () use ($validated, $advisorId, $jobCardNo) {
             $partsTotal = 0.00;
             $laborTotal = 0.00;

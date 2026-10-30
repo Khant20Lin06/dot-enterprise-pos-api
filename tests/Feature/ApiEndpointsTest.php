@@ -163,7 +163,7 @@ it('creates automotive Job Card and converts it to official POS invoice', functi
     Sanctum::actingAs($staff);
 
     $customer = Customer::first();
-    $vehicle = Vehicle::first();
+    $vehicle = Vehicle::where('customer_id', $customer->id)->first() ?? Vehicle::create(['customer_id' => $customer->id, 'plate_number' => 'YGN-TEST-88', 'make' => 'Toyota', 'model' => 'Hilux']);
     $mechanic = Mechanic::first();
     $part = Product::where('is_labor', false)->where('stock', '>=', 3)->first();
     $initialStock = (float) $part->stock;

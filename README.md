@@ -9,7 +9,7 @@
 [![MySQL](https://img.shields.io/badge/MySQL-8.0_ACID-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://mysql.com)
 [![Redis](https://img.shields.io/badge/Redis-7_Queues-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
 [![Laravel Reverb](https://img.shields.io/badge/Laravel_Reverb-WebSockets-F05340?style=for-the-badge&logo=laravel&logoColor=white)](https://laravel.com/docs/reverb)
-[![Pest Tests](https://img.shields.io/badge/Pest_PHP-38_Passed_%7C_156_Asserts-10B981?style=for-the-badge&logo=pest&logoColor=white)](https://pestphp.com)
+[![Pest Tests](https://img.shields.io/badge/Pest_PHP-42_Passed_%7C_164_Asserts-10B981?style=for-the-badge&logo=pest&logoColor=white)](https://pestphp.com)
 [![Docker](https://img.shields.io/badge/Docker-6_Services-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
 <p align="center">
@@ -271,8 +271,8 @@ The test suite validates database relational integrity, concurrency locking, Web
   ✓ it settles customer credit debt via API and returns ledger
   ✓ it retrieves daily sales and workshop executive summary report via API
 
-  Tests:    38 passed (156 assertions)
-  Duration: 2.44s
+  Tests:    42 passed (164 assertions)
+  Duration: 2.48s
 ```
 
 ---

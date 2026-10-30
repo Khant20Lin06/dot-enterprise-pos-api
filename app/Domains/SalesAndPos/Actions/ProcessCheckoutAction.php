@@ -107,6 +107,14 @@ class ProcessCheckoutAction
                 }
             }
 
+            // VULN-01 Hardening: Strict Financial Invariant (Zero Payment Deficit)
+            $totalTendered = round($paidAmount + $dueAmount, 2);
+            if ($totalTendered < $totalAmount) {
+                throw new \DomainException(
+                    "Payment deficit: Total order amount is {$totalAmount} Ks, but total allocated tender is only {$totalTendered} Ks."
+                );
+            }
+
             // 4. Validate and Update Customer Credit Balance if sold on credit
             $customer = null;
             if ($customerId) {
@@ -160,6 +168,24 @@ class ProcessCheckoutAction
                 'points_redeemed' => $pointsRedeemed,
                 'status' => 'Completed',
                 'idempotency_key' => $data['idempotency_key'] ?? null,
+            ]);
+
+            // VULN-07 Hardening: Immutable Financial Transaction Audit Log
+            \App\Domains\SecurityAndAudit\Models\AuditLog::create([
+                'staff_id' => $cashierId,
+                'module' => 'sales_and_pos',
+                'action' => 'checkout_completed',
+                'severity' => 'info',
+                'resource_type' => 'sales_orders',
+                'resource_id' => $salesOrder->id,
+                'description' => "Order {$salesOrder->order_no} finalized. Total: {$totalAmount} Ks, Paid: {$paidAmount} Ks, Due: {$dueAmount} Ks",
+                'diffs' => [
+                    'order_no' => $salesOrder->order_no,
+                    'total_amount' => $totalAmount,
+                    'paid_amount' => $paidAmount,
+                    'due_amount' => $dueAmount,
+                ],
+                'created_at' => now(),
             ]);
 
             // 8. Create Sales Order Line Items

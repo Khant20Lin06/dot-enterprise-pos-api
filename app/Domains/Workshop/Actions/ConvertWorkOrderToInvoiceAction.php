@@ -38,8 +38,9 @@ class ConvertWorkOrderToInvoiceAction
                 throw new \DomainException("Job Card '{$workOrder->job_card_no}' has already been invoiced.");
             }
 
-            // 2. Automated Inventory Deduction for every fitted part (Resolving Audit Gap!)
-            foreach ($workOrder->items as $item) {
+            // 2. Automated Inventory Deduction for every fitted part (Deadlock-safe sorted locks)
+            $sortedItems = $workOrder->items->sortBy('product_id');
+            foreach ($sortedItems as $item) {
                 if (!$item->is_outsourced && $item->product_id) {
                     $this->deductStockAction->execute($item->product_id, $item->qty);
                 }
@@ -65,8 +66,8 @@ class ConvertWorkOrderToInvoiceAction
                 $customer->increment('due_amount', $dueAmount);
             }
 
-            // 5. Generate Sales Order (Invoice)
-            $orderNo = 'INV-' . now()->format('Ymd') . '-' . str_pad((string) (SalesOrder::count() + 1), 4, '0', STR_PAD_LEFT);
+            // 5. Generate Sales Order with Atomic Concurrency-Safe Sequencing
+            $orderNo = app(\App\Services\AtomicSequenceService::class)->getNextSequence('INV');
 
             $salesOrder = SalesOrder::create([
                 'order_no' => $orderNo,
