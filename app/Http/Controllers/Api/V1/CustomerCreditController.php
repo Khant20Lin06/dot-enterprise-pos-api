@@ -26,13 +26,12 @@ class CustomerCreditController extends Controller
             $search = $request->query('search');
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%");
+                  ->orWhere('phone', 'like', "%{$search}%");
             });
         }
 
         if ($request->boolean('has_debt')) {
-            $query->where('current_due', '>', 0);
+            $query->where('due_amount', '>', 0);
         }
 
         if ($request->filled('fleet_id')) {
@@ -40,7 +39,7 @@ class CustomerCreditController extends Controller
         }
 
         $perPage = min((int) $request->query('per_page', 20), 100);
-        $customers = $query->orderByDesc('current_due')->paginate($perPage);
+        $customers = $query->orderByDesc('due_amount')->paginate($perPage);
 
         return CustomerResource::collection($customers);
     }

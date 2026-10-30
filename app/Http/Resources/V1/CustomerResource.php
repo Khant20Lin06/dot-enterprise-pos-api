@@ -16,6 +16,7 @@ class CustomerResource extends JsonResource
             'phone' => $this->phone,
             'email' => $this->email,
             'address' => $this->address,
+            'tier' => $this->tier,
             'creditLimit' => (float) $this->credit_limit,
             'currentDue' => (float) $this->current_due,
             'availableCredit' => (float) max(0, $this->credit_limit - $this->current_due),
@@ -25,16 +26,17 @@ class CustomerResource extends JsonResource
                 'name' => $this->fleet->name,
                 'discountPercent' => (float) $this->fleet->discount_percent,
             ] : null,
-            'vehicles' => $this->vehicles->map(function ($vehicle) {
+            'vehicles' => $this->vehicles ? $this->vehicles->map(function ($vehicle) {
                 return [
                     'id' => $vehicle->id,
-                    'licensePlate' => $vehicle->license_plate,
+                    'licensePlate' => $vehicle->plate_number ?? $vehicle->license_plate,
+                    'plateNumber' => $vehicle->plate_number ?? $vehicle->license_plate,
                     'make' => $vehicle->make,
                     'model' => $vehicle->model,
                     'year' => $vehicle->year,
                     'vin' => $vehicle->vin,
                 ];
-            }),
+            }) : [],
             'createdAt' => $this->created_at?->toIso8601String(),
         ];
     }

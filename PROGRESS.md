@@ -28,6 +28,7 @@
 | **Phase E** | Payment Gateways, Cashier Shifts & Reconciliation (Shift Open/Close, Blind Count, MMQR, X/Z-Reports) | 🟢 Completed | 100% |
 | **Phase F** | Enterprise Red-Team Hardening & Vulnerability Remediation (CRIT-01 to CRIT-04, HIGH-01 to HIGH-04, MED-01 to MED-03) | 🟢 Completed | 100% |
 | **Phase G** | Multi-UOM Packaging Conversions & Automotive Vehicle Fitment Matrix (Drum/Box/Carton, ACES/PIES compatibility) | 🟢 Completed | 100% |
+| **Phase H** | Master Data CRUD, Inbound Procurement & Workshop Workflow Harmonization (Customers, Vehicles, Purchases, Suppliers, Stock Adjustments) | 🟢 Completed | 100% |
 
 ---
 
@@ -257,3 +258,33 @@
 - [x] Pest Feature Test Suite:
   - `tests/Feature/MultiUomAndVehicleFitmentTest.php`: 10 passed (37 assertions).
   - Full Test Suite: **103 passed (489 assertions) — 100% pass rate in 5.49s**.
+
+---
+
+### Phase H: Master Data CRUD, Inbound Procurement & Workshop Workflow Harmonization
+- [x] **Bug Fix & Schema Remediation:**
+  - Fixed `CustomerCreditController` `current_due` SQL bug (`due_amount`), resolving MySQL 8.0 500 error.
+  - Removed missing `code` column query from customer search filter.
+- [x] **Master Data Full CRUD Endpoints:**
+  - `CustomerController`: `GET|POST /api/v1/customers`, `GET|PUT|DELETE /api/v1/customers/{id}` with debt guards (`due_amount > 0`) and transaction history safeguards.
+  - `VehicleController`: `GET|POST /api/v1/vehicles`, `GET|PUT|DELETE /api/v1/vehicles/{id}` with plate number uniqueness and active work order guards.
+  - `CategoryController`: `GET|POST /api/v1/categories`, `GET|PUT|DELETE /api/v1/categories/{id}` with linked product deletion guards.
+  - `UnitOfMeasureController`: `GET|POST /api/v1/units-of-measure`, `GET|PUT|DELETE /api/v1/units-of-measure/{id}` with in-use guards.
+  - `ProductController`: Implemented missing `store()`, `update()`, and `destroy()` methods with automatic warehouse initial stock reconciliation and sales history protection.
+- [x] **Inbound Procurement & Supplier Supply Chain:**
+  - `SupplierController`: `GET|POST|PUT|DELETE /api/v1/suppliers` with purchase history protection.
+  - `ReceivePurchaseAction`: ACID transaction recalculating Weighted Moving Average Cost, updating physical warehouse stock and master inventory with row locking, and crediting supplier payables.
+  - `PurchaseController`: `GET|POST /api/v1/purchases`, `GET /api/v1/purchases/{id}`, `POST /api/v1/purchases/{id}/receive` (GRN), `POST /api/v1/purchases/{id}/cancel`.
+  - `StockAdjustmentController`: `GET|POST /api/v1/stock-adjustments` (Cycle Count, Scrap/Damage, write-offs) with staff audit logging and negative stock violation guards.
+- [x] **Workshop Operations & Payment Harmonization:**
+  - `WorkOrderController`: Implemented `PUT /work-orders/{id}` for live job card edits (recalculating parts, labor, and grand totals), `PATCH /work-orders/{id}/status` state machine, and `POST /work-orders/{id}/cancel`.
+  - `ConvertWorkOrderToInvoiceAction`: Refactored to support multi-tender split payments (Cash + KPay + Wave + Card + Credit) and warehouse-context stock deduction.
+  - Broadcasts `WorkOrderStatusChangedEvent` on Reverb `workshop.bay` channel on status updates and cancellations.
+- [x] **Business Logic & Accounting Invariant Alignment:**
+  - `ProcessSaleReturnAction`: Aligned with Packaging UOM returns, restoring base stock proportionally and refunding full packaging price.
+  - `ProcessCheckoutAction`: Integrated `ResolveDynamicPriceAction` for automatic customer wholesale tier pricing and volume breaks; resolved cashier active shift session warehouse to eliminate stock drift.
+- [x] **Pest Feature Test Suite:**
+  - `tests/Feature/MasterDataCrudTest.php`: 4 passed (39 assertions).
+  - `tests/Feature/PurchasesAndSuppliersTest.php`: 3 passed (22 assertions).
+  - `tests/Feature/WorkshopWorkflowAndPricingAlignmentTest.php`: 5 passed (23 assertions).
+  - Full Test Suite: **115 passed (573 assertions) — 100% pass rate in 6.22s**.

@@ -21,16 +21,19 @@ class ConvertWorkOrderToInvoiceAction
 
     /**
      * Convert Work Order / Job Card into an official Invoice (SalesOrder),
-     * automatically deducting inventory, calculating mechanic commissions,
-     * and recording payment splits.
+     * automatically deducting inventory with warehouse resolution, calculating mechanic commissions,
+     * and supporting multi-tender payment splits.
+     *
+     * @param  array<array<string, mixed>>|string  $paymentMethod  Single method or array of multi-tender splits
      */
     public function execute(
         int $workOrderId,
-        string $paymentMethod = 'Cash',
+        array|string $paymentMethod = 'Cash',
         int $cashierId = 1,
-        ?string $paymentRef = null
+        ?string $paymentRef = null,
+        ?int $warehouseId = null
     ): array {
-        return DB::transaction(function () use ($workOrderId, $paymentMethod, $cashierId, $paymentRef) {
+        return DB::transaction(function () use ($workOrderId, $paymentMethod, $cashierId, $paymentRef, $warehouseId) {
             // 1. Lock Work Order
             $workOrder = WorkOrder::with('items.product')->where('id', $workOrderId)->lockForUpdate()->firstOrFail();
 
@@ -38,24 +41,75 @@ class ConvertWorkOrderToInvoiceAction
                 throw new \DomainException("Job Card '{$workOrder->job_card_no}' has already been invoiced.");
             }
 
+            if ($workOrder->status === 'Cancelled') {
+                throw new \DomainException("Cannot invoice cancelled Job Card '{$workOrder->job_card_no}'.");
+            }
+
+            // Resolve cashier active session & warehouse
+            $activeSession = \App\Domains\SalesAndPos\Models\PosSession::where('cashier_id', $cashierId)
+                ->where('status', 'open')
+                ->first();
+            $targetWarehouseId = $warehouseId ?? $activeSession?->warehouse_id;
+
             // 2. Automated Inventory Deduction for every fitted part (Deadlock-safe sorted locks)
             $sortedItems = $workOrder->items->sortBy('product_id');
             foreach ($sortedItems as $item) {
-                if (!$item->is_outsourced && $item->product_id) {
-                    $this->deductStockAction->execute($item->product_id, $item->qty);
+                if (! $item->is_outsourced && $item->product_id) {
+                    $conversionFactor = (float) ($item->conversion_factor ?: 1.0);
+                    $baseQtyToDeduct = (int) ceil($item->qty * $conversionFactor);
+
+                    $this->deductStockAction->execute(
+                        productId: $item->product_id,
+                        qty: $baseQtyToDeduct,
+                        productOptionId: null,
+                        warehouseId: $targetWarehouseId,
+                        productVariantId: null
+                    );
                 }
             }
 
             // 3. Calculate Mechanic Commission
             $commission = $this->calculateCommissionAction->execute($workOrder);
 
-            // 4. Handle Credit / Due Authorization if sold on account
+            // 4. Multi-Tender Payment Splits Normalization
             $totalAmount = (float) $workOrder->total_amount;
-            $isCredit = ($paymentMethod === 'Credit');
-            $paidAmount = $isCredit ? 0.00 : $totalAmount;
-            $dueAmount = $isCredit ? $totalAmount : 0.00;
+            $paymentSplits = [];
 
-            if ($isCredit) {
+            if (is_array($paymentMethod)) {
+                $paymentSplits = $paymentMethod;
+            } else {
+                $paymentSplits = [
+                    [
+                        'method' => $paymentMethod,
+                        'amount' => $totalAmount,
+                        'reference_no' => $paymentRef,
+                    ],
+                ];
+            }
+
+            $dueAmount = 0.00;
+            $paidAmount = 0.00;
+
+            foreach ($paymentSplits as $split) {
+                $amt = (float) ($split['amount'] ?? 0.00);
+                if (strtolower($split['method'] ?? '') === 'credit') {
+                    $dueAmount += $amt;
+                } else {
+                    $paidAmount += $amt;
+                }
+            }
+
+            $totalTendered = round($paidAmount + $dueAmount, 2);
+            if ($totalTendered < $totalAmount) {
+                throw new \DomainException(
+                    "Payment deficit: Job Card total is {$totalAmount} Ks, but total allocated tender is only {$totalTendered} Ks."
+                );
+            }
+
+            $changeAmount = max(0.00, round($totalTendered - $totalAmount, 2));
+
+            // Customer Credit Authorization
+            if ($dueAmount > 0) {
                 $customer = Customer::where('id', $workOrder->customer_id)->lockForUpdate()->firstOrFail();
                 $newDue = (float) $customer->due_amount + $dueAmount;
                 if ($customer->credit_limit > 0 && $newDue > (float) $customer->credit_limit) {
@@ -69,9 +123,6 @@ class ConvertWorkOrderToInvoiceAction
             // 5. Generate Sales Order with Atomic Concurrency-Safe Sequencing
             $orderNo = app(\App\Services\AtomicSequenceService::class)->getNextSequence('INV');
 
-            // Resolve active shift session for cashier if open
-            $activeSession = \App\Domains\SalesAndPos\Models\PosSession::where('cashier_id', $cashierId)->where('status', 'open')->first();
-
             $salesOrder = SalesOrder::create([
                 'order_no' => $orderNo,
                 'customer_id' => $workOrder->customer_id,
@@ -84,6 +135,7 @@ class ConvertWorkOrderToInvoiceAction
                 'tax_amount' => 0.00,
                 'total_amount' => $totalAmount,
                 'paid_amount' => $paidAmount,
+                'change_amount' => $changeAmount,
                 'due_amount' => $dueAmount,
                 'status' => 'Completed',
             ]);
@@ -118,13 +170,26 @@ class ConvertWorkOrderToInvoiceAction
                 }
             }
 
-            // 8. Record Payment Split
-            PaymentSplit::create([
-                'sales_order_id' => $salesOrder->id,
-                'method' => $paymentMethod,
-                'amount' => $totalAmount,
-                'reference_no' => $paymentRef,
-            ]);
+            // 8. Record Multi-Tender Payment Splits
+            foreach ($paymentSplits as $split) {
+                $method = $split['method'] ?? 'Cash';
+                $gatewayProvider = match (strtolower($method)) {
+                    'kpay', 'kbzpay' => 'kbzpay',
+                    'wave', 'wavepay' => 'wavepay',
+                    'card', 'credit card' => 'card',
+                    'credit', 'due' => 'credit',
+                    default => 'cash',
+                };
+
+                PaymentSplit::create([
+                    'sales_order_id' => $salesOrder->id,
+                    'method' => $method,
+                    'amount' => (float) ($split['amount'] ?? 0.00),
+                    'status' => 'completed',
+                    'gateway_provider' => $gatewayProvider,
+                    'reference_no' => $split['reference_no'] ?? null,
+                ]);
+            }
 
             // 9. Update Work Order Status
             $workOrder->update([
@@ -132,7 +197,7 @@ class ConvertWorkOrderToInvoiceAction
                 'sales_order_id' => $salesOrder->id,
             ]);
 
-            $freshWorkOrder = $workOrder->fresh(['items', 'vehicle', 'customer', 'mechanic']);
+            $freshWorkOrder = $workOrder->fresh(['items', 'vehicle', 'customer', 'primaryMechanic']);
             $freshSalesOrder = $salesOrder->fresh(['items', 'payments', 'customer', 'cashier']);
 
             // 10. Broadcast Real-Time Reverb WebSocket Events

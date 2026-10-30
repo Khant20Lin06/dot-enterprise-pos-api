@@ -2,17 +2,24 @@
 
 use App\Http\Controllers\Api\V1\AttributeController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\CategoryController;
+use App\Http\Controllers\Api\V1\CustomerController;
 use App\Http\Controllers\Api\V1\CustomerCreditController;
 use App\Http\Controllers\Api\V1\PaymentGatewayController;
 use App\Http\Controllers\Api\V1\PosController;
 use App\Http\Controllers\Api\V1\PosSessionController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProductUomConversionController;
+use App\Http\Controllers\Api\V1\PurchaseController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\SalesReturnController;
 use App\Http\Controllers\Api\V1\StaffUserController;
+use App\Http\Controllers\Api\V1\StockAdjustmentController;
 use App\Http\Controllers\Api\V1\StockTransferController;
+use App\Http\Controllers\Api\V1\SupplierController;
+use App\Http\Controllers\Api\V1\UnitOfMeasureController;
+use App\Http\Controllers\Api\V1\VehicleController;
 use App\Http\Controllers\Api\V1\VehicleFitmentController;
 use App\Http\Controllers\Api\V1\WarehouseController;
 use App\Http\Controllers\Api\V1\WorkOrderController;
@@ -52,8 +59,14 @@ Route::prefix('v1')->group(function () {
         // Catalog & Inventory
         Route::prefix('products')->group(function () {
             Route::get('/', [ProductController::class, 'index']);
+            Route::post('/', [ProductController::class, 'store'])
+                ->middleware('permission:inventory,create');
             Route::get('/barcode/{barcode}', [ProductController::class, 'lookupBarcode']);
             Route::get('/{id}', [ProductController::class, 'show']);
+            Route::put('/{id}', [ProductController::class, 'update'])
+                ->middleware('permission:inventory,edit');
+            Route::delete('/{id}', [ProductController::class, 'destroy'])
+                ->middleware('permission:inventory,edit');
             Route::post('/{id}/barcode', [ProductController::class, 'barcode']);
             Route::get('/{id}/variants', [ProductController::class, 'variants']);
             Route::post('/{id}/variants/matrix', [ProductController::class, 'generateMatrix'])
@@ -71,6 +84,30 @@ Route::prefix('v1')->group(function () {
             Route::post('/{id}/fitments', [VehicleFitmentController::class, 'store'])
                 ->middleware('permission:inventory,create');
             Route::delete('/{id}/fitments/{fitmentId}', [VehicleFitmentController::class, 'destroy'])
+                ->middleware('permission:inventory,edit');
+        });
+
+        // Categories Master
+        Route::prefix('categories')->group(function () {
+            Route::get('/', [CategoryController::class, 'index']);
+            Route::post('/', [CategoryController::class, 'store'])
+                ->middleware('permission:inventory,create');
+            Route::get('/{id}', [CategoryController::class, 'show']);
+            Route::put('/{id}', [CategoryController::class, 'update'])
+                ->middleware('permission:inventory,edit');
+            Route::delete('/{id}', [CategoryController::class, 'destroy'])
+                ->middleware('permission:inventory,edit');
+        });
+
+        // Units of Measure Master
+        Route::prefix('units-of-measure')->group(function () {
+            Route::get('/', [UnitOfMeasureController::class, 'index']);
+            Route::post('/', [UnitOfMeasureController::class, 'store'])
+                ->middleware('permission:inventory,create');
+            Route::get('/{id}', [UnitOfMeasureController::class, 'show']);
+            Route::put('/{id}', [UnitOfMeasureController::class, 'update'])
+                ->middleware('permission:inventory,edit');
+            Route::delete('/{id}', [UnitOfMeasureController::class, 'destroy'])
                 ->middleware('permission:inventory,edit');
         });
 
@@ -146,25 +183,50 @@ Route::prefix('v1')->group(function () {
                 ->middleware('permission:workshop,create');
             Route::get('/work-orders/{id}', [WorkOrderController::class, 'show'])
                 ->middleware('permission:workshop,view');
+            Route::put('/work-orders/{id}', [WorkOrderController::class, 'update'])
+                ->middleware('permission:workshop,edit');
+            Route::patch('/work-orders/{id}/status', [WorkOrderController::class, 'updateStatus'])
+                ->middleware('permission:workshop,edit');
+            Route::post('/work-orders/{id}/cancel', [WorkOrderController::class, 'cancel'])
+                ->middleware('permission:workshop,edit');
             Route::post('/work-orders/{id}/convert-to-invoice', [WorkOrderController::class, 'convertToInvoice'])
                 ->middleware('permission:workshop,approveJobCard');
         });
 
-        // Automotive Vehicle Fitment & Compatibility Search
+        // Automotive Vehicles Registry & Compatibility Search
         Route::prefix('vehicles')->group(function () {
+            Route::get('/', [VehicleController::class, 'index'])
+                ->middleware('permission:workshop,view');
+            Route::post('/', [VehicleController::class, 'store'])
+                ->middleware('permission:workshop,create');
+            Route::get('/{id}', [VehicleController::class, 'show'])
+                ->middleware('permission:workshop,view');
+            Route::put('/{id}', [VehicleController::class, 'update'])
+                ->middleware('permission:workshop,edit');
+            Route::delete('/{id}', [VehicleController::class, 'destroy'])
+                ->middleware('permission:workshop,edit');
             Route::get('/{id}/compatible-parts', [VehicleFitmentController::class, 'compatibleParts'])
                 ->middleware('permission:workshop,view');
         });
         Route::get('/catalog/compatibility-search', [VehicleFitmentController::class, 'search'])
             ->middleware('permission:pos,view');
 
-        // Customers & Credit Ledger
+        // Customers Master & Credit Ledger
         Route::prefix('customers')->group(function () {
-            Route::get('/', [CustomerCreditController::class, 'index']);
-            Route::get('/{id}', [CustomerCreditController::class, 'show']);
+            Route::get('/', [CustomerController::class, 'index'])
+                ->middleware('permission:pos,view');
+            Route::post('/', [CustomerController::class, 'store'])
+                ->middleware('permission:pos,create');
+            Route::get('/{id}', [CustomerController::class, 'show'])
+                ->middleware('permission:pos,view');
+            Route::put('/{id}', [CustomerController::class, 'update'])
+                ->middleware('permission:pos,edit');
+            Route::delete('/{id}', [CustomerController::class, 'destroy'])
+                ->middleware('permission:settings,manageRoles');
             Route::post('/{id}/settle-credit', [CustomerCreditController::class, 'settleCredit'])
                 ->middleware('permission:finances,approveCreditLimit');
-            Route::get('/{id}/ledger', [CustomerCreditController::class, 'ledger']);
+            Route::get('/{id}/ledger', [CustomerCreditController::class, 'ledger'])
+                ->middleware('permission:finances,view');
         });
 
         // Executive Reports & Analytics (Restricted to Finance/Admin)
@@ -224,6 +286,40 @@ Route::prefix('v1')->group(function () {
             Route::post('/{id}/receive', [StockTransferController::class, 'receiveTransfer'])
                 ->middleware('permission:inventory,adjustStock');
             Route::post('/{id}/cancel', [StockTransferController::class, 'cancelTransfer'])
+                ->middleware('permission:inventory,adjustStock');
+        });
+
+        // Suppliers Management
+        Route::prefix('suppliers')->group(function () {
+            Route::get('/', [SupplierController::class, 'index']);
+            Route::post('/', [SupplierController::class, 'store'])
+                ->middleware('permission:purchases,create');
+            Route::get('/{id}', [SupplierController::class, 'show']);
+            Route::put('/{id}', [SupplierController::class, 'update'])
+                ->middleware('permission:purchases,edit');
+            Route::delete('/{id}', [SupplierController::class, 'destroy'])
+                ->middleware('permission:purchases,edit');
+        });
+
+        // Purchase Orders & Inbound Goods Receiving (GRN)
+        Route::prefix('purchases')->group(function () {
+            Route::get('/', [PurchaseController::class, 'index'])
+                ->middleware('permission:purchases,view');
+            Route::post('/', [PurchaseController::class, 'store'])
+                ->middleware('permission:purchases,create');
+            Route::get('/{id}', [PurchaseController::class, 'show'])
+                ->middleware('permission:purchases,view');
+            Route::post('/{id}/receive', [PurchaseController::class, 'receive'])
+                ->middleware('permission:purchases,receive');
+            Route::post('/{id}/cancel', [PurchaseController::class, 'cancel'])
+                ->middleware('permission:purchases,edit');
+        });
+
+        // Physical Stock Adjustments & Audits
+        Route::prefix('stock-adjustments')->group(function () {
+            Route::get('/', [StockAdjustmentController::class, 'index'])
+                ->middleware('permission:inventory,view');
+            Route::post('/', [StockAdjustmentController::class, 'store'])
                 ->middleware('permission:inventory,adjustStock');
         });
     });

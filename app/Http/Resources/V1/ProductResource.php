@@ -22,6 +22,7 @@ class ProductResource extends JsonResource
             ] : null,
             'unit' => $this->unitOfMeasure?->code ?? 'PCS',
             'retailPrice' => (float) $this->retail_price,
+            'sellPrice' => (float) $this->retail_price,
             'wholesalePrice' => (float) $this->wholesale_price,
             'costPrice' => $request->user()?->hasPermission('inventory', 'viewCostPrice') ? (float) $this->cost_price : null,
             'stock' => (float) $this->stock,

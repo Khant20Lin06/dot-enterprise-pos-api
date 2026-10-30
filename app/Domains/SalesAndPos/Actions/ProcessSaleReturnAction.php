@@ -85,21 +85,32 @@ class ProcessSaleReturnAction
                     throw new InvalidArgumentException("Order item ID #{$orderItemId} does not belong to order #{$salesOrder->order_no}.");
                 }
 
+                // Packaging UOM Unit Conversion Alignment
+                $isPackaging = (! empty($entry['is_packaging']) || isset($entry['packaging_qty'])) && $orderItem->uom_conversion_id;
+                $conversionFactor = (float) ($orderItem->conversion_factor ?: 1.0);
+                $effectiveQty = $isPackaging
+                    ? (int) ceil((isset($entry['packaging_qty']) ? (int) $entry['packaging_qty'] : $qty) * $conversionFactor)
+                    : $qty;
+
+                if ($effectiveQty <= 0) {
+                    throw new InvalidArgumentException('Returned quantity must be greater than zero.');
+                }
+
                 // Check previously returned quantity for this line item
                 $previouslyReturnedQty = (int) SalesReturnItem::where('sales_order_item_id', $orderItem->id)
                     ->sum('qty');
 
                 $maxReturnable = $orderItem->qty - $previouslyReturnedQty;
 
-                if ($qty > $maxReturnable) {
+                if ($effectiveQty > $maxReturnable) {
                     throw new InvalidArgumentException(
-                        "Cannot return {$qty} of '{$orderItem->name}'. Maximum returnable quantity is {$maxReturnable} (Purchased: {$orderItem->qty}, Previously Returned: {$previouslyReturnedQty})."
+                        "Cannot return {$effectiveQty} base units of '{$orderItem->name}'. Maximum returnable quantity is {$maxReturnable} (Purchased: {$orderItem->qty}, Previously Returned: {$previouslyReturnedQty})."
                     );
                 }
 
                 // Effective unit price based on subtotal (considers discounts)
                 $effectiveUnitPrice = round((float) $orderItem->subtotal / $orderItem->qty, 2);
-                $lineRefund = round($effectiveUnitPrice * $qty, 2);
+                $lineRefund = round($effectiveUnitPrice * $effectiveQty, 2);
                 $totalRefundAmount += $lineRefund;
 
                 $shouldRestock = ($condition === 'Sellable');
@@ -112,7 +123,7 @@ class ProcessSaleReturnAction
                     'product_id' => $orderItem->product_id,
                     'product_option_id' => $orderItem->product_option_id,
                     'product_variant_id' => $orderItem->product_variant_id,
-                    'qty' => $qty,
+                    'qty' => $effectiveQty,
                     'unit_price' => $effectiveUnitPrice,
                     'refund_subtotal' => $lineRefund,
                     'item_condition' => $condition,

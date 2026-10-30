@@ -8,6 +8,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Phase H Implementation: Master Data CRUD, Inbound Procurement & Workshop Workflow Harmonization:**
+  - **Critical Bug Fixes:**
+    - Corrected column name in `CustomerCreditController` from non-existent `current_due` to `due_amount`, preventing Fatal 500 error on MySQL 8.0.
+    - Removed non-existent `code` column from customer search query.
+  - **Master Data Full CRUD Controllers & Requests:**
+    - `CustomerController`: `GET|POST /api/v1/customers`, `GET|PUT|DELETE /api/v1/customers/{id}` with validation on unique phone, credit limit checks, and deletion guards for customers with active receivables or historical orders.
+    - `VehicleController`: `GET|POST /api/v1/vehicles`, `GET|PUT|DELETE /api/v1/vehicles/{id}` with license plate uniqueness and active work order guards.
+    - `CategoryController`: `GET|POST|PUT|DELETE /api/v1/categories` with deletion guards against active catalog products.
+    - `UnitOfMeasureController`: `GET|POST|PUT|DELETE /api/v1/units-of-measure` with in-use guards.
+    - `ProductController`: Added `store()`, `update()`, and `destroy()` endpoints with automatic warehouse stock synchronization and historical sales order protection.
+  - **Procurement & Supply Chain Engine:**
+    - `SupplierController`: `GET|POST|PUT|DELETE /api/v1/suppliers` with validation and historical PO deletion protection.
+    - `ReceivePurchaseAction`: ACID transaction recalculating Weighted Moving Average Cost, allocating stock to target warehouse and master catalog with pessimistic row locking, and crediting supplier payable debt.
+    - `PurchaseController`: `GET|POST /api/v1/purchases`, `GET /api/v1/purchases/{id}`, `POST /api/v1/purchases/{id}/receive` (GRN), `POST /api/v1/purchases/{id}/cancel`.
+    - `StockAdjustmentController`: `GET|POST /api/v1/stock-adjustments` (Cycle Count, Scrap/Damage, write-offs) with staff audit logging and negative stock violation guards.
+  - **Workshop Operations & Payment Harmonization:**
+    - `WorkOrderController`: Added `PUT /api/v1/workshop/work-orders/{id}` for live job card line item edits with automated total recalculation, `PATCH /api/v1/workshop/work-orders/{id}/status` state machine, and `POST /api/v1/workshop/work-orders/{id}/cancel`.
+    - `ConvertWorkOrderToInvoiceAction`: Added multi-tender split payment support (Cash, KPay, Wave, Card, Credit) and warehouse-context stock deduction.
+    - Real-Time WebSocket broadcast of `WorkOrderStatusChangedEvent` on status changes and cancellations.
+  - **Business Logic & Accounting Invariant Alignment:**
+    - `ProcessSaleReturnAction`: Packaging UOM unit return alignment with proportional base inventory restock and accurate box refunds.
+    - `ProcessCheckoutAction`: Integrated `ResolveDynamicPriceAction` for automatic customer wholesale tier pricing and volume breaks; resolved cashier active shift session warehouse to eliminate stock drift.
+  - **Pest Feature Test Suites:**
+    - `tests/Feature/MasterDataCrudTest.php` (4 tests)
+    - `tests/Feature/PurchasesAndSuppliersTest.php` (3 tests)
+    - `tests/Feature/WorkshopWorkflowAndPricingAlignmentTest.php` (5 tests)
+    - Total 12 new tests (115 total tests, 573 assertions, 100% pass rate).
 - **Phase G Implementation: Multi-UOM Packaging Conversions & Automotive Vehicle Fitment Compatibility Matrix:**
   - **Database Migration (`2026_10_30_000014_create_multi_uom_and_vehicle_fitment_tables.php`):**
     - `product_uom_conversions`: Packaging unit rules (e.g. 1 Box = 10 Pcs, 1 Drum = 200 Liters) with dedicated packaging barcodes, bulk selling prices, and cost prices.

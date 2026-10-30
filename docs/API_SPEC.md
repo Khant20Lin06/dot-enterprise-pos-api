@@ -62,6 +62,97 @@
 }
 ```
 
+### 2.11. Create Product
+* **Endpoint:** `POST /products`
+* **Permissions:** `inventory,create`
+* **Request Body:**
+```json
+{
+  "category_id": 1,
+  "uom_id": 2,
+  "supplier_id": 1,
+  "name": "Mobil 1 Super Synthetic 0W-20",
+  "barcode": "M1-0W20-AUTO",
+  "cost_price": 45000.00,
+  "sell_price": 60000.00,
+  "wholesale_price": 55000.00,
+  "initial_stock": 50,
+  "warehouse_id": 1,
+  "min_stock": 10
+}
+```
+
+### 2.12. Update Product
+* **Endpoint:** `PUT /products/{id}`
+* **Permissions:** `inventory,edit`
+* **Request Body:**
+```json
+{
+  "sell_price": 62000.00,
+  "min_stock": 12
+}
+```
+
+### 2.13. Delete Product
+* **Endpoint:** `DELETE /products/{id}`
+* **Permissions:** `inventory,edit`
+* **Guards:** Blocked if product has historical sales order items or workshop job cards.
+
+### 2.14. Categories Master CRUD
+* **Endpoints:**
+  * `GET /categories`
+  * `POST /categories` (Payload: `code`, `name`, `description`)
+  * `GET /categories/{id}`
+  * `PUT /categories/{id}`
+  * `DELETE /categories/{id}` (Guarded against in-use products)
+
+### 2.15. Units of Measure Master CRUD
+* **Endpoints:**
+  * `GET /units-of-measure`
+  * `POST /units-of-measure` (Payload: `name`, `description`)
+  * `GET /units-of-measure/{id}`
+  * `PUT /units-of-measure/{id}`
+  * `DELETE /units-of-measure/{id}` (Guarded against in-use products)
+
+### 2.16. Suppliers Master CRUD
+* **Endpoints:**
+  * `GET /suppliers`
+  * `POST /suppliers` (Payload: `name`, `phone`, `contact_person`, `address`)
+  * `GET /suppliers/{id}`
+  * `PUT /suppliers/{id}`
+  * `DELETE /suppliers/{id}` (Guarded against purchase history)
+
+### 2.17. Purchase Orders & Goods Receiving (GRN)
+* **Create PO:** `POST /purchases`
+```json
+{
+  "supplier_id": 1,
+  "warehouse_id": 1,
+  "notes": "Bulk restocking",
+  "receive_immediately": false,
+  "items": [
+    { "product_id": 101, "qty": 20, "unit_price": 50000.00 }
+  ]
+}
+```
+* **Receive PO (GRN):** `POST /purchases/{id}/receive`
+* Recalculates Weighted Moving Average Cost, updates physical warehouse stock and master stock, and credits supplier payable debt.
+* **Cancel PO:** `POST /purchases/{id}/cancel` (Guarded: only Draft POs can be cancelled).
+
+### 2.18. Physical Stock Adjustments & Audits
+* **Endpoint:** `POST /stock-adjustments`
+* **Permissions:** `inventory,adjustStock`
+* **Request Body:**
+```json
+{
+  "product_id": 101,
+  "warehouse_id": 1,
+  "type": "Damage / Scrap",
+  "adjusted_qty": -3,
+  "reason": "Container leaked during transit"
+}
+```
+
 ---
 
 ## 2. Products & Inventory API
@@ -331,6 +422,97 @@
 }
 ```
 
+### 2.11. Create Product
+* **Endpoint:** `POST /products`
+* **Permissions:** `inventory,create`
+* **Request Body:**
+```json
+{
+  "category_id": 1,
+  "uom_id": 2,
+  "supplier_id": 1,
+  "name": "Mobil 1 Super Synthetic 0W-20",
+  "barcode": "M1-0W20-AUTO",
+  "cost_price": 45000.00,
+  "sell_price": 60000.00,
+  "wholesale_price": 55000.00,
+  "initial_stock": 50,
+  "warehouse_id": 1,
+  "min_stock": 10
+}
+```
+
+### 2.12. Update Product
+* **Endpoint:** `PUT /products/{id}`
+* **Permissions:** `inventory,edit`
+* **Request Body:**
+```json
+{
+  "sell_price": 62000.00,
+  "min_stock": 12
+}
+```
+
+### 2.13. Delete Product
+* **Endpoint:** `DELETE /products/{id}`
+* **Permissions:** `inventory,edit`
+* **Guards:** Blocked if product has historical sales order items or workshop job cards.
+
+### 2.14. Categories Master CRUD
+* **Endpoints:**
+  * `GET /categories`
+  * `POST /categories` (Payload: `code`, `name`, `description`)
+  * `GET /categories/{id}`
+  * `PUT /categories/{id}`
+  * `DELETE /categories/{id}` (Guarded against in-use products)
+
+### 2.15. Units of Measure Master CRUD
+* **Endpoints:**
+  * `GET /units-of-measure`
+  * `POST /units-of-measure` (Payload: `name`, `description`)
+  * `GET /units-of-measure/{id}`
+  * `PUT /units-of-measure/{id}`
+  * `DELETE /units-of-measure/{id}` (Guarded against in-use products)
+
+### 2.16. Suppliers Master CRUD
+* **Endpoints:**
+  * `GET /suppliers`
+  * `POST /suppliers` (Payload: `name`, `phone`, `contact_person`, `address`)
+  * `GET /suppliers/{id}`
+  * `PUT /suppliers/{id}`
+  * `DELETE /suppliers/{id}` (Guarded against purchase history)
+
+### 2.17. Purchase Orders & Goods Receiving (GRN)
+* **Create PO:** `POST /purchases`
+```json
+{
+  "supplier_id": 1,
+  "warehouse_id": 1,
+  "notes": "Bulk restocking",
+  "receive_immediately": false,
+  "items": [
+    { "product_id": 101, "qty": 20, "unit_price": 50000.00 }
+  ]
+}
+```
+* **Receive PO (GRN):** `POST /purchases/{id}/receive`
+* Recalculates Weighted Moving Average Cost, updates physical warehouse stock and master stock, and credits supplier payable debt.
+* **Cancel PO:** `POST /purchases/{id}/cancel` (Guarded: only Draft POs can be cancelled).
+
+### 2.18. Physical Stock Adjustments & Audits
+* **Endpoint:** `POST /stock-adjustments`
+* **Permissions:** `inventory,adjustStock`
+* **Request Body:**
+```json
+{
+  "product_id": 101,
+  "warehouse_id": 1,
+  "type": "Damage / Scrap",
+  "adjusted_qty": -3,
+  "reason": "Container leaked during transit"
+}
+```
+
 ---
 
 ## 3. POS Terminal & Checkout API
@@ -484,6 +666,97 @@
 }
 ```
 
+### 2.11. Create Product
+* **Endpoint:** `POST /products`
+* **Permissions:** `inventory,create`
+* **Request Body:**
+```json
+{
+  "category_id": 1,
+  "uom_id": 2,
+  "supplier_id": 1,
+  "name": "Mobil 1 Super Synthetic 0W-20",
+  "barcode": "M1-0W20-AUTO",
+  "cost_price": 45000.00,
+  "sell_price": 60000.00,
+  "wholesale_price": 55000.00,
+  "initial_stock": 50,
+  "warehouse_id": 1,
+  "min_stock": 10
+}
+```
+
+### 2.12. Update Product
+* **Endpoint:** `PUT /products/{id}`
+* **Permissions:** `inventory,edit`
+* **Request Body:**
+```json
+{
+  "sell_price": 62000.00,
+  "min_stock": 12
+}
+```
+
+### 2.13. Delete Product
+* **Endpoint:** `DELETE /products/{id}`
+* **Permissions:** `inventory,edit`
+* **Guards:** Blocked if product has historical sales order items or workshop job cards.
+
+### 2.14. Categories Master CRUD
+* **Endpoints:**
+  * `GET /categories`
+  * `POST /categories` (Payload: `code`, `name`, `description`)
+  * `GET /categories/{id}`
+  * `PUT /categories/{id}`
+  * `DELETE /categories/{id}` (Guarded against in-use products)
+
+### 2.15. Units of Measure Master CRUD
+* **Endpoints:**
+  * `GET /units-of-measure`
+  * `POST /units-of-measure` (Payload: `name`, `description`)
+  * `GET /units-of-measure/{id}`
+  * `PUT /units-of-measure/{id}`
+  * `DELETE /units-of-measure/{id}` (Guarded against in-use products)
+
+### 2.16. Suppliers Master CRUD
+* **Endpoints:**
+  * `GET /suppliers`
+  * `POST /suppliers` (Payload: `name`, `phone`, `contact_person`, `address`)
+  * `GET /suppliers/{id}`
+  * `PUT /suppliers/{id}`
+  * `DELETE /suppliers/{id}` (Guarded against purchase history)
+
+### 2.17. Purchase Orders & Goods Receiving (GRN)
+* **Create PO:** `POST /purchases`
+```json
+{
+  "supplier_id": 1,
+  "warehouse_id": 1,
+  "notes": "Bulk restocking",
+  "receive_immediately": false,
+  "items": [
+    { "product_id": 101, "qty": 20, "unit_price": 50000.00 }
+  ]
+}
+```
+* **Receive PO (GRN):** `POST /purchases/{id}/receive`
+* Recalculates Weighted Moving Average Cost, updates physical warehouse stock and master stock, and credits supplier payable debt.
+* **Cancel PO:** `POST /purchases/{id}/cancel` (Guarded: only Draft POs can be cancelled).
+
+### 2.18. Physical Stock Adjustments & Audits
+* **Endpoint:** `POST /stock-adjustments`
+* **Permissions:** `inventory,adjustStock`
+* **Request Body:**
+```json
+{
+  "product_id": 101,
+  "warehouse_id": 1,
+  "type": "Damage / Scrap",
+  "adjusted_qty": -3,
+  "reason": "Container leaked during transit"
+}
+```
+
 ---
 
 ## 4. Workshop & Job Cards API
@@ -541,6 +814,97 @@
 }
 ```
 
+### 2.11. Create Product
+* **Endpoint:** `POST /products`
+* **Permissions:** `inventory,create`
+* **Request Body:**
+```json
+{
+  "category_id": 1,
+  "uom_id": 2,
+  "supplier_id": 1,
+  "name": "Mobil 1 Super Synthetic 0W-20",
+  "barcode": "M1-0W20-AUTO",
+  "cost_price": 45000.00,
+  "sell_price": 60000.00,
+  "wholesale_price": 55000.00,
+  "initial_stock": 50,
+  "warehouse_id": 1,
+  "min_stock": 10
+}
+```
+
+### 2.12. Update Product
+* **Endpoint:** `PUT /products/{id}`
+* **Permissions:** `inventory,edit`
+* **Request Body:**
+```json
+{
+  "sell_price": 62000.00,
+  "min_stock": 12
+}
+```
+
+### 2.13. Delete Product
+* **Endpoint:** `DELETE /products/{id}`
+* **Permissions:** `inventory,edit`
+* **Guards:** Blocked if product has historical sales order items or workshop job cards.
+
+### 2.14. Categories Master CRUD
+* **Endpoints:**
+  * `GET /categories`
+  * `POST /categories` (Payload: `code`, `name`, `description`)
+  * `GET /categories/{id}`
+  * `PUT /categories/{id}`
+  * `DELETE /categories/{id}` (Guarded against in-use products)
+
+### 2.15. Units of Measure Master CRUD
+* **Endpoints:**
+  * `GET /units-of-measure`
+  * `POST /units-of-measure` (Payload: `name`, `description`)
+  * `GET /units-of-measure/{id}`
+  * `PUT /units-of-measure/{id}`
+  * `DELETE /units-of-measure/{id}` (Guarded against in-use products)
+
+### 2.16. Suppliers Master CRUD
+* **Endpoints:**
+  * `GET /suppliers`
+  * `POST /suppliers` (Payload: `name`, `phone`, `contact_person`, `address`)
+  * `GET /suppliers/{id}`
+  * `PUT /suppliers/{id}`
+  * `DELETE /suppliers/{id}` (Guarded against purchase history)
+
+### 2.17. Purchase Orders & Goods Receiving (GRN)
+* **Create PO:** `POST /purchases`
+```json
+{
+  "supplier_id": 1,
+  "warehouse_id": 1,
+  "notes": "Bulk restocking",
+  "receive_immediately": false,
+  "items": [
+    { "product_id": 101, "qty": 20, "unit_price": 50000.00 }
+  ]
+}
+```
+* **Receive PO (GRN):** `POST /purchases/{id}/receive`
+* Recalculates Weighted Moving Average Cost, updates physical warehouse stock and master stock, and credits supplier payable debt.
+* **Cancel PO:** `POST /purchases/{id}/cancel` (Guarded: only Draft POs can be cancelled).
+
+### 2.18. Physical Stock Adjustments & Audits
+* **Endpoint:** `POST /stock-adjustments`
+* **Permissions:** `inventory,adjustStock`
+* **Request Body:**
+```json
+{
+  "product_id": 101,
+  "warehouse_id": 1,
+  "type": "Damage / Scrap",
+  "adjusted_qty": -3,
+  "reason": "Container leaked during transit"
+}
+```
+
 ---
 
 ## 5. Customer Credit Ledger API
@@ -565,6 +929,97 @@
     "settled_amount": 50000.00,
     "remaining_due": 25000.00
   }
+}
+```
+
+### 2.11. Create Product
+* **Endpoint:** `POST /products`
+* **Permissions:** `inventory,create`
+* **Request Body:**
+```json
+{
+  "category_id": 1,
+  "uom_id": 2,
+  "supplier_id": 1,
+  "name": "Mobil 1 Super Synthetic 0W-20",
+  "barcode": "M1-0W20-AUTO",
+  "cost_price": 45000.00,
+  "sell_price": 60000.00,
+  "wholesale_price": 55000.00,
+  "initial_stock": 50,
+  "warehouse_id": 1,
+  "min_stock": 10
+}
+```
+
+### 2.12. Update Product
+* **Endpoint:** `PUT /products/{id}`
+* **Permissions:** `inventory,edit`
+* **Request Body:**
+```json
+{
+  "sell_price": 62000.00,
+  "min_stock": 12
+}
+```
+
+### 2.13. Delete Product
+* **Endpoint:** `DELETE /products/{id}`
+* **Permissions:** `inventory,edit`
+* **Guards:** Blocked if product has historical sales order items or workshop job cards.
+
+### 2.14. Categories Master CRUD
+* **Endpoints:**
+  * `GET /categories`
+  * `POST /categories` (Payload: `code`, `name`, `description`)
+  * `GET /categories/{id}`
+  * `PUT /categories/{id}`
+  * `DELETE /categories/{id}` (Guarded against in-use products)
+
+### 2.15. Units of Measure Master CRUD
+* **Endpoints:**
+  * `GET /units-of-measure`
+  * `POST /units-of-measure` (Payload: `name`, `description`)
+  * `GET /units-of-measure/{id}`
+  * `PUT /units-of-measure/{id}`
+  * `DELETE /units-of-measure/{id}` (Guarded against in-use products)
+
+### 2.16. Suppliers Master CRUD
+* **Endpoints:**
+  * `GET /suppliers`
+  * `POST /suppliers` (Payload: `name`, `phone`, `contact_person`, `address`)
+  * `GET /suppliers/{id}`
+  * `PUT /suppliers/{id}`
+  * `DELETE /suppliers/{id}` (Guarded against purchase history)
+
+### 2.17. Purchase Orders & Goods Receiving (GRN)
+* **Create PO:** `POST /purchases`
+```json
+{
+  "supplier_id": 1,
+  "warehouse_id": 1,
+  "notes": "Bulk restocking",
+  "receive_immediately": false,
+  "items": [
+    { "product_id": 101, "qty": 20, "unit_price": 50000.00 }
+  ]
+}
+```
+* **Receive PO (GRN):** `POST /purchases/{id}/receive`
+* Recalculates Weighted Moving Average Cost, updates physical warehouse stock and master stock, and credits supplier payable debt.
+* **Cancel PO:** `POST /purchases/{id}/cancel` (Guarded: only Draft POs can be cancelled).
+
+### 2.18. Physical Stock Adjustments & Audits
+* **Endpoint:** `POST /stock-adjustments`
+* **Permissions:** `inventory,adjustStock`
+* **Request Body:**
+```json
+{
+  "product_id": 101,
+  "warehouse_id": 1,
+  "type": "Damage / Scrap",
+  "adjusted_qty": -3,
+  "reason": "Container leaked during transit"
 }
 ```
 

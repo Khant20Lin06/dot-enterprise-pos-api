@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domains\Workshop\Actions\ConvertWorkOrderToInvoiceAction;
+use App\Domains\Workshop\Events\WorkOrderStatusChangedEvent;
 use App\Domains\Workshop\Models\WorkOrder;
 use App\Domains\Workshop\Models\WorkOrderItem;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\CreateWorkOrderRequest;
+use App\Http\Requests\V1\UpdateWorkOrderRequest;
 use App\Http\Resources\V1\SalesOrderResource;
 use App\Http\Resources\V1\WorkOrderResource;
 use Illuminate\Http\JsonResponse;
@@ -131,14 +133,139 @@ class WorkOrderController extends Controller
     }
 
     /**
+     * Update automotive Job Card complaint, details, or line items.
+     */
+    public function update(UpdateWorkOrderRequest $request, int $id): JsonResponse
+    {
+        $workOrder = WorkOrder::with('items')->findOrFail($id);
+
+        if (in_array($workOrder->status, ['Completed / Invoiced', 'Cancelled'])) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot update Job Card #{$workOrder->job_card_no} with status '{$workOrder->status}'.",
+            ], 422);
+        }
+
+        $validated = $request->validated();
+
+        $updated = DB::transaction(function () use ($workOrder, $validated) {
+            if (isset($validated['items'])) {
+                // Delete existing items and recreate
+                $workOrder->items()->delete();
+
+                $partsTotal = 0.00;
+                $laborTotal = 0.00;
+
+                foreach ($validated['items'] as $item) {
+                    $itemTotal = (float) $item['unit_price'] * (int) $item['qty'];
+                    if (($item['item_type'] ?? 'part') === 'labor') {
+                        $laborTotal += $itemTotal;
+                    } else {
+                        $partsTotal += $itemTotal;
+                    }
+
+                    WorkOrderItem::create([
+                        'work_order_id' => $workOrder->id,
+                        'product_id' => $item['product_id'],
+                        'item_type' => $item['item_type'] ?? 'part',
+                        'name' => $item['name'] ?? 'Workshop Item',
+                        'qty' => $item['qty'],
+                        'unit_price' => $item['unit_price'],
+                        'subtotal' => $itemTotal,
+                        'is_approved' => $item['is_approved'] ?? true,
+                    ]);
+                }
+
+                $workOrder->parts_total = $partsTotal;
+                $workOrder->labor_fee = $laborTotal;
+                $workOrder->total_amount = $partsTotal + $laborTotal;
+            }
+
+            $fillable = array_diff_key($validated, ['items' => true]);
+            $workOrder->fill($fillable);
+            $workOrder->save();
+
+            return $workOrder->fresh(['customer', 'vehicle', 'serviceAdvisor', 'primaryMechanic', 'items.product']);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Job Card updated successfully.',
+            'data' => new WorkOrderResource($updated),
+        ]);
+    }
+
+    /**
+     * Transition Job Card status and broadcast WebSocket update.
+     */
+    public function updateStatus(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'status' => ['required', 'string', 'in:Intake / Estimate,Under Inspection,In Progress,Waiting for Parts,QC & Ready,Cancelled'],
+        ]);
+
+        $workOrder = WorkOrder::findOrFail($id);
+
+        if ($workOrder->status === 'Completed / Invoiced') {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot change status of invoiced Job Card #{$workOrder->job_card_no}.",
+            ], 422);
+        }
+
+        $prevStatus = $workOrder->status;
+        $workOrder->update(['status' => $request->status]);
+
+        event(new WorkOrderStatusChangedEvent($workOrder->fresh(['vehicle', 'customer']), $prevStatus));
+
+        return response()->json([
+            'success' => true,
+            'message' => "Job Card status transitioned to '{$request->status}'.",
+            'data' => new WorkOrderResource($workOrder->fresh(['customer', 'vehicle', 'serviceAdvisor', 'primaryMechanic', 'items.product'])),
+        ]);
+    }
+
+    /**
+     * Cancel an active Job Card.
+     */
+    public function cancel(int $id): JsonResponse
+    {
+        $workOrder = WorkOrder::findOrFail($id);
+
+        if ($workOrder->status === 'Completed / Invoiced') {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot cancel an invoiced Job Card #{$workOrder->job_card_no}.",
+            ], 422);
+        }
+
+        $prevStatus = $workOrder->status;
+        $workOrder->update(['status' => 'Cancelled']);
+
+        event(new WorkOrderStatusChangedEvent($workOrder->fresh(['vehicle', 'customer']), $prevStatus));
+
+        return response()->json([
+            'success' => true,
+            'message' => "Job Card #{$workOrder->job_card_no} has been cancelled.",
+        ]);
+    }
+
+    /**
      * Convert automotive Job Card into official POS invoice, deducting part inventory & logging commissions.
+     * Supports both single payment and multi-tender split payments.
      */
     public function convertToInvoice(int $id, ConvertWorkOrderToInvoiceAction $action, Request $request): JsonResponse
     {
         $cashierId = $request->user()?->id ?? 1;
-        $paymentMethod = $request->input('payment_method', 'Cash');
+        $payments = $request->input('payments') ?? $request->input('payment_splits') ?? $request->input('payment_method', 'Cash');
 
-        $result = $action->execute($id, $paymentMethod, $cashierId);
+        $result = $action->execute(
+            workOrderId: $id,
+            paymentMethod: $payments,
+            cashierId: $cashierId,
+            paymentRef: $request->input('payment_ref'),
+            warehouseId: $request->input('warehouse_id')
+        );
 
         return response()->json([
             'success' => true,

@@ -39,6 +39,10 @@ class ProcessCheckoutAction
             $items = $data['items'] ?? [];
             $paymentSplits = $data['payment_splits'] ?? $data['payments'] ?? [];
 
+            // Resolve active shift session & warehouse location to prevent stock drift
+            $activeSession = \App\Domains\SalesAndPos\Models\PosSession::where('cashier_id', $cashierId)->where('status', 'open')->first();
+            $defaultWarehouseId = isset($data['warehouse_id']) ? (int) $data['warehouse_id'] : $activeSession?->warehouse_id;
+
             // Hardening 1: Deadlock Prevention via Consistent Lock Acquisition Ordering
             // Sort items ascending by product_id so all concurrent transactions lock rows in the exact same sequence.
             usort($items, function ($a, $b) {
@@ -56,7 +60,7 @@ class ProcessCheckoutAction
                 $optionId = isset($itemData['product_option_id']) ? (int) $itemData['product_option_id'] : null;
                 $variantId = isset($itemData['product_variant_id']) ? (int) $itemData['product_variant_id'] : (isset($itemData['variant_id']) ? (int) $itemData['variant_id'] : null);
                 $uomConversionId = isset($itemData['uom_conversion_id']) ? (int) $itemData['uom_conversion_id'] : null;
-                $warehouseId = isset($data['warehouse_id']) ? (int) $data['warehouse_id'] : null;
+                $warehouseId = isset($itemData['warehouse_id']) ? (int) $itemData['warehouse_id'] : $defaultWarehouseId;
 
                 // Enterprise Multi-UOM Resolution
                 $uomConversion = null;
@@ -77,7 +81,7 @@ class ProcessCheckoutAction
                 // Pessimistic Row Locking in action: deduct baseQtyToDeduct from stock
                 $product = $this->deductStockAction->execute($productId, $baseQtyToDeduct, $optionId, $warehouseId, $variantId);
 
-                // Hardening 2: Server-Authoritative Price Validation (Anti-Price Tampering)
+                // Hardening 2: Server-Authoritative Price Validation (Anti-Price Tampering) & Dynamic Tier Pricing
                 $catalogPrice = (float) ($product->sell_price ?: $product->retail_price);
                 if ($uomConversion) {
                     $catalogPrice = (float) $uomConversion->sell_price;
@@ -85,6 +89,12 @@ class ProcessCheckoutAction
                     $variant = \App\Domains\Inventory\Models\ProductVariant::find($variantId);
                     if ($variant && (float) $variant->price > 0) {
                         $catalogPrice = (float) $variant->price;
+                    }
+                } elseif (class_exists(\App\Domains\PricingAndPromotions\Actions\ResolveDynamicPriceAction::class)) {
+                    $dynamicPriceResult = app(\App\Domains\PricingAndPromotions\Actions\ResolveDynamicPriceAction::class)
+                        ->execute($product, $qty, $customerId);
+                    if (! empty($dynamicPriceResult['is_custom'])) {
+                        $catalogPrice = (float) $dynamicPriceResult['unit_price'];
                     }
                 }
                 $requestedPrice = isset($itemData['unit_price']) ? (float) $itemData['unit_price'] : $catalogPrice;

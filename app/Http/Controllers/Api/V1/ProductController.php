@@ -5,14 +5,20 @@ namespace App\Http\Controllers\Api\V1;
 use App\Domains\Inventory\Actions\GenerateVariantMatrixAction;
 use App\Domains\Inventory\Actions\ResolveBarcodeAction;
 use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\Warehouse;
+use App\Domains\Inventory\Models\WarehouseStock;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\V1\CreateProductRequest;
 use App\Http\Requests\V1\GenerateVariantMatrixRequest;
+use App\Http\Requests\V1\UpdateProductRequest;
 use App\Http\Resources\V1\ProductResource;
 use App\Http\Resources\V1\ProductVariantResource;
+use App\Services\AtomicSequenceService;
 use App\Services\NodeWorkerBridgeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
@@ -66,6 +72,100 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'data' => new ProductResource($product),
+        ]);
+    }
+
+    /**
+     * Create a new product with optional initial inventory allocation.
+     */
+    public function store(CreateProductRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+
+        $product = DB::transaction(function () use ($validated) {
+            $initialStock = (int) ($validated['initial_stock'] ?? 0);
+            $warehouseId = $validated['warehouse_id'] ?? null;
+
+            // Generate unique barcode if omitted
+            if (empty($validated['barcode'])) {
+                $validated['barcode'] = 'PRD-' . strtoupper(bin2hex(random_bytes(4)));
+            }
+
+            $validated['stock'] = $initialStock;
+
+            $product = Product::create($validated);
+
+            // Reconcile initial physical stock in target warehouse to prevent stock drift
+            if ($initialStock > 0 && ! $product->is_labor) {
+                $targetWarehouse = $warehouseId
+                    ? Warehouse::find($warehouseId)
+                    : (Warehouse::where('is_central', true)->first() ?? Warehouse::first());
+
+                if ($targetWarehouse) {
+                    WarehouseStock::updateOrCreate(
+                        [
+                            'warehouse_id' => $targetWarehouse->id,
+                            'product_id' => $product->id,
+                            'product_option_id' => null,
+                        ],
+                        [
+                            'stock_qty' => $initialStock,
+                        ]
+                    );
+                }
+            }
+
+            return $product;
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product created successfully.',
+            'data' => new ProductResource($product->load(['category', 'unitOfMeasure'])),
+        ], 201);
+    }
+
+    /**
+     * Update product details and catalog pricing.
+     */
+    public function update(UpdateProductRequest $request, int $id): JsonResponse
+    {
+        $product = Product::findOrFail($id);
+        $product->update($request->validated());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product updated successfully.',
+            'data' => new ProductResource($product->fresh(['category', 'unitOfMeasure'])),
+        ]);
+    }
+
+    /**
+     * Delete product (guarded against sales and workshop transaction history).
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        $product = Product::findOrFail($id);
+
+        if ($product->salesOrderItems()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete product '{$product->name}' (#{$id}). It is referenced in past sales order invoices. Retain record for accounting integrity.",
+            ], 422);
+        }
+
+        if ($product->workOrderItems()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete product '{$product->name}' (#{$id}). It is referenced in past automotive workshop job cards.",
+            ], 422);
+        }
+
+        $product->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product deleted successfully.',
         ]);
     }
 
