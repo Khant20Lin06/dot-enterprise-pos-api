@@ -30,6 +30,7 @@
 | **Phase G** | Multi-UOM Packaging Conversions & Automotive Vehicle Fitment Matrix (Drum/Box/Carton, ACES/PIES compatibility) | 🟢 Completed | 100% |
 | **Phase H** | Master Data CRUD, Inbound Procurement & Workshop Workflow Harmonization (Customers, Vehicles, Purchases, Suppliers, Stock Adjustments) | 🟢 Completed | 100% |
 | **Phase I** | Forensic Hardening: Red-Team Security, Concurrency Locking & Anti-Drift Variant Stock | 🟢 Completed | 100% |
+| **Phase J** | Enterprise Accounting Integrity: Credit Overpayment Change, Supervisor POS Order Voiding & Scoped Held Carts | 🟢 Completed | 100% |
 
 ---
 
@@ -319,3 +320,28 @@
 - [x] **Pest Feature Test Suite:**
   - `tests/Feature/Phase1SecurityAndConcurrencyTest.php`: 7 passed (25 assertions).
   - Full Test Suite: **122 passed (598 assertions) — 100% pass rate in 12.29s**.
+
+---
+
+### Phase J: Enterprise Accounting Integrity: Credit Overpayment Change, Supervisor POS Order Voiding & Scoped Held Carts
+- [x] **Database Migration (`2026_10_30_000015_phase2_accounting_integrity_and_void.php`):**
+  - Added `tendered_amount` and `change_amount` to `credit_settlements` table.
+  - Added `voided_at`, `void_reason`, and `voided_by` (foreign key to `staff_users`) to `sales_orders` table.
+  - Added `pos_session_id` (foreign key to `pos_sessions`) to `held_orders` table.
+- [x] **Credit Settlement Overpayment & Cash Drawer Float Alignment:**
+  - `SettleCustomerCreditAction`: Tracks exact cash tendered (`tendered_amount`), calculates returned change (`change_amount`), clears outstanding customer debt, and returns change due in API response.
+  - `ClosePosSessionAction`: Verifies cash drawer formula `Opening Float + Net Cash Sales + Credit Collections - Cash Refunds`, eliminating unexplained cash surplus or shortage variances.
+- [x] **Official POS Order Void Action:**
+  - `VoidOrderAction`: Implemented atomic transactional voiding of erroneous checkout orders within active cashier shift.
+  - Restores physical warehouse inventory (`warehouse_stocks`) and master product stock (`products`) using pessimistic row locking.
+  - Automatically reverses customer credit debts, rolls back earned loyalty points, and refunds redeemed points.
+  - Enforces supervisor authorization (supervisor PIN or authenticated supervisor token with `pos.voidInvoice` permission).
+  - Strictly rejects voiding historical orders from closed shift sessions, mandating official `SalesReturn` instead for audit compliance.
+  - Added route `POST /api/v1/pos/orders/{id}/void` in `routes/api.php`.
+- [x] **Held Order Shift Session Scoping & Ownership Protection:**
+  - `PosController::parkOrder`: Automatically associates parked carts with cashier active shift session.
+  - `PosController::listHeldOrders`: Scopes list to cashier active session, preventing cart confusion across multi-counter checkouts.
+  - `PosController::deleteHeldOrder`: Enforces ownership check, blocking cashiers from deleting carts created by other cashier terminals.
+- [x] **Pest Feature Test Suite:**
+  - `tests/Feature/Phase2AccountingAndVoidTest.php`: 6 passed (31 assertions).
+  - Full Test Suite: **128 passed (629 assertions) — 100% pass rate in 13.32s**.

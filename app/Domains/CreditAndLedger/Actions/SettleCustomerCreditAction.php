@@ -28,8 +28,9 @@ class SettleCustomerCreditAction
             // 1. Lock customer row to prevent concurrent balance race condition
             $customer = Customer::where('id', $customerId)->lockForUpdate()->firstOrFail();
 
-            // 2. Compute settlement amount (cannot pay more than current due unless credited)
+            // 2. Compute settlement amount and change amount (for cash overpayment)
             $settleAmount = min($amount, (float) $customer->due_amount);
+            $changeAmount = round(max(0.00, $amount - $settleAmount), 2);
 
             // 3. Deduct Due Balance
             $customer->decrement('due_amount', $settleAmount);
@@ -40,11 +41,13 @@ class SettleCustomerCreditAction
             // Resolve active cashier shift session if not explicitly provided
             $resolvedSessionId = $posSessionId ?? ($cashierId ? \App\Domains\SalesAndPos\Models\PosSession::where('cashier_id', $cashierId)->where('status', 'open')->first()?->id : null);
 
-            // 5. Create Settlement Record
+            // 5. Create Settlement Record with full audit trail of tendered vs returned cash
             return CreditSettlement::create([
                 'receipt_no' => $receiptNo,
                 'customer_id' => $customer->id,
                 'amount' => $settleAmount,
+                'tendered_amount' => $amount,
+                'change_amount' => $changeAmount,
                 'payment_method' => $paymentMethod,
                 'note' => $note,
                 'cashier_id' => $cashierId ?? 1,

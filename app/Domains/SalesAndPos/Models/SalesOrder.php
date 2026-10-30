@@ -31,6 +31,9 @@ class SalesOrder extends Model
         'points_earned',
         'points_redeemed',
         'status',
+        'voided_at',
+        'void_reason',
+        'voided_by',
         'idempotency_key',
     ];
 
@@ -45,6 +48,7 @@ class SalesOrder extends Model
         'due_amount' => 'decimal:2',
         'points_earned' => 'integer',
         'points_redeemed' => 'integer',
+        'voided_at' => 'datetime',
     ];
 
     public function customer(): BelongsTo
@@ -60,6 +64,11 @@ class SalesOrder extends Model
     public function cashier(): BelongsTo
     {
         return $this->belongsTo(StaffUser::class, 'cashier_id');
+    }
+
+    public function voidedBy(): BelongsTo
+    {
+        return $this->belongsTo(StaffUser::class, 'voided_by');
     }
 
     public function posSession(): BelongsTo

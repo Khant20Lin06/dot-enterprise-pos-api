@@ -142,6 +142,8 @@ Route::prefix('v1')->group(function () {
                 ->middleware('permission:pos,view');
             Route::post('/orders/{id}/reprint', [PosController::class, 'reprintReceipt'])
                 ->middleware(['throttle:60,1', 'permission:pos,create']);
+            Route::post('/orders/{id}/void', [PosController::class, 'voidOrder'])
+                ->middleware(['throttle:30,1', 'permission:pos,create']);
 
             // Parked Carts (Held Orders)
             Route::get('/held-orders', [PosController::class, 'listHeldOrders'])

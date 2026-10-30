@@ -81,6 +81,7 @@ class CustomerCreditController extends Controller
             'message' => 'Customer credit debt settled successfully.',
             'data' => [
                 'settlement' => $settlement,
+                'change_due' => (float) $settlement->change_amount,
                 'customer' => new CustomerResource($customer),
             ],
         ]);

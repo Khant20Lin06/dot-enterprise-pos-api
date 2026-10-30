@@ -35,12 +35,16 @@ class ProcessCheckoutAction
         }
 
         return DB::transaction(function () use ($data, $cashierId) {
+            $effectiveCashierId = $data['cashier_id'] ?? $cashierId;
             $customerId = $data['customer_id'] ?? null;
             $items = $data['items'] ?? [];
             $paymentSplits = $data['payment_splits'] ?? $data['payments'] ?? [];
 
             // Resolve active shift session & warehouse location to prevent stock drift
-            $activeSession = \App\Domains\SalesAndPos\Models\PosSession::where('cashier_id', $cashierId)->where('status', 'open')->first();
+            $sessionId = $data['pos_session_id'] ?? null;
+            $activeSession = $sessionId
+                ? \App\Domains\SalesAndPos\Models\PosSession::find($sessionId)
+                : \App\Domains\SalesAndPos\Models\PosSession::where('cashier_id', $effectiveCashierId)->where('status', 'open')->first();
             $defaultWarehouseId = isset($data['warehouse_id']) ? (int) $data['warehouse_id'] : $activeSession?->warehouse_id;
 
             // Hardening 1: Deadlock Prevention via Consistent Lock Acquisition Ordering

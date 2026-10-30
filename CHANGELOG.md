@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Phase 2 Implementation: Enterprise Accounting Integrity: Credit Overpayment Change, Supervisor POS Order Voiding & Scoped Held Carts:**
+  - **Database Schema Migration (`2026_10_30_000015_phase2_accounting_integrity_and_void.php`):**
+    - Added `tendered_amount` and `change_amount` columns to `credit_settlements`.
+    - Added `voided_at`, `void_reason`, and `voided_by` columns to `sales_orders`.
+    - Added `pos_session_id` column to `held_orders`.
+  - **Customer Credit Settlement Overpayment Handling:**
+    - `SettleCustomerCreditAction`: Correctly computes `settleAmount = min(tendered, due_amount)` and `changeAmount = tendered - settleAmount`. Persists both values to `credit_settlements` and exposes `change_due` in JSON response.
+    - Prevents cash drawer variance anomalies during shift session closing and blind count audits.
+  - **Official POS Order Void Action (`VoidOrderAction` & `POST /api/v1/pos/orders/{id}/void`):**
+    - Provides a dedicated transaction reversal mechanism for accidental or wrong checkout entries, preventing distortion of Gross Sales and Return KPIs.
+    - Restores inventory in target warehouse and central catalog with pessimistic locking.
+    - Reverses customer credit debt, rolls back earned loyalty points, and restores redeemed points.
+    - Enforces supervisor authorization (supervisor PIN verification or role with `pos.voidInvoice` permission).
+    - Blocks voiding orders from closed shift sessions, mandating official Sales Return instead.
+  - **Held Order Shift Scoping & Cross-Counter Protection:**
+    - `PosController`: Automatically associates parked carts with active shift session; restricts listing and deletion so cashiers cannot tamper with or delete other cashiers' parked orders.
+  - **Automated Pest Feature Tests:**
+    - `tests/Feature/Phase2AccountingAndVoidTest.php`: 6 new feature tests covering credit overpayment change, drawer float reconciliation, supervisor voiding with stock restoration, closed session guards, and held order isolation.
+    - Total Test Suite: **128 passed (629 assertions) — 100% pass rate**.
 - **Phase I Implementation: Forensic Hardening: Red-Team Security, Concurrency Locking & Anti-Drift Variant Stock:**
   - **Granular RBAC Authorization on Read/Reconnaissance Endpoints:**
     - Attached `permission:purchases,view` to `GET /api/v1/suppliers` and `GET /api/v1/suppliers/{id}` to prevent unauthorized staff from viewing supplier debts and vendor contracts.

@@ -14,6 +14,7 @@ class HeldOrder extends Model
         'title',
         'customer_id',
         'cashier_id',
+        'pos_session_id',
         'cart_data',
         'subtotal',
     ];
@@ -22,6 +23,11 @@ class HeldOrder extends Model
         'cart_data' => 'array',
         'subtotal' => 'decimal:2',
     ];
+
+    public function posSession(): BelongsTo
+    {
+        return $this->belongsTo(PosSession::class, 'pos_session_id');
+    }
 
     public function customer(): BelongsTo
     {

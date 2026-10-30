@@ -12,6 +12,8 @@ class CreditSettlement extends Model
         'receipt_no',
         'customer_id',
         'amount',
+        'tendered_amount',
+        'change_amount',
         'payment_method',
         'note',
         'cashier_id',
@@ -20,6 +22,8 @@ class CreditSettlement extends Model
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'tendered_amount' => 'decimal:2',
+        'change_amount' => 'decimal:2',
     ];
 
     public function posSession(): BelongsTo
