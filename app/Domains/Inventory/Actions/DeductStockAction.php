@@ -15,82 +15,93 @@ class DeductStockAction
      */
     public function execute(int $productId, int $qty, ?int $productOptionId = null, ?int $warehouseId = null, ?int $productVariantId = null): Product
     {
-        // 1. Lock Product Row for Update
-        $product = Product::where('id', $productId)->lockForUpdate()->firstOrFail();
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($productId, $qty, $productOptionId, $warehouseId, $productVariantId) {
+            // 1. Lock Product Row for Update
+            $product = Product::where('id', $productId)->lockForUpdate()->firstOrFail();
 
-        // Labor charges do not deduct physical inventory
-        if ($product->is_labor) {
-            return $product;
-        }
+            // Labor charges do not deduct physical inventory
+            if ($product->is_labor) {
+                return $product;
+            }
 
-        // 2. Validate Available Stock
-        if ($product->stock < $qty) {
-            throw new InsufficientStockException(
-                "Product '{$product->name}' has insufficient stock. Requested: {$qty}, Available: {$product->stock}."
-            );
-        }
+            // 2. Validate Available Master Stock
+            if ($product->stock < $qty) {
+                throw new InsufficientStockException(
+                    "Product '{$product->name}' has insufficient stock. Requested: {$qty}, Available: {$product->stock}."
+                );
+            }
 
-        // 3. Deduct Master Stock
-        $product->decrement('stock', $qty);
-        $freshProduct = $product->fresh();
+            // 3. Lock & Validate Legacy Variant Option if provided
+            $option = null;
+            if ($productOptionId) {
+                $option = ProductOption::where('id', $productOptionId)
+                    ->where('product_id', $productId)
+                    ->lockForUpdate()
+                    ->first();
 
-        // 4. If Legacy Variant Option provided, lock and deduct option stock as well
-        if ($productOptionId) {
-            $option = ProductOption::where('id', $productOptionId)
-                ->where('product_id', $productId)
-                ->lockForUpdate()
-                ->first();
-
-            if ($option) {
-                if ($option->stock < $qty) {
+                if ($option && $option->stock < $qty) {
                     throw new InsufficientStockException(
                         "Variant '{$option->name}' has insufficient stock. Requested: {$qty}, Available: {$option->stock}."
                     );
                 }
-                $option->decrement('stock', $qty);
             }
-        }
 
-        // 4b. If Multi-Attribute Product Variant provided, lock and deduct variant stock as well
-        if ($productVariantId) {
-            $variant = \App\Domains\Inventory\Models\ProductVariant::where('id', $productVariantId)
-                ->where('product_id', $productId)
-                ->lockForUpdate()
-                ->first();
+            // 4. Lock & Validate Multi-Attribute Product Variant if provided
+            $variant = null;
+            if ($productVariantId) {
+                $variant = \App\Domains\Inventory\Models\ProductVariant::where('id', $productVariantId)
+                    ->where('product_id', $productId)
+                    ->lockForUpdate()
+                    ->first();
 
-            if ($variant) {
-                if ($variant->stock < $qty) {
+                if ($variant && $variant->stock < $qty) {
                     throw new InsufficientStockException(
                         "Variant '{$variant->sku}' has insufficient stock. Requested: {$qty}, Available: {$variant->stock}."
                     );
                 }
-                $variant->decrement('stock', $qty);
             }
-        }
 
-        // 5. If specific physical Warehouse location provided, lock and deduct warehouse stock
-        if ($warehouseId) {
-            $whStock = \App\Domains\Inventory\Models\WarehouseStock::where('warehouse_id', $warehouseId)
-                ->where('product_id', $productId)
-                ->when($productOptionId, fn ($q) => $q->where('product_option_id', $productOptionId))
-                ->lockForUpdate()
-                ->first();
+            // 5. Lock & Validate Specific Warehouse Location Stock strictly
+            $whStock = null;
+            if ($warehouseId) {
+                $whStock = \App\Domains\Inventory\Models\WarehouseStock::where('warehouse_id', $warehouseId)
+                    ->where('product_id', $productId)
+                    ->when($productOptionId, fn ($q) => $q->where('product_option_id', $productOptionId))
+                    ->lockForUpdate()
+                    ->first();
 
-            if ($whStock) {
-                if ($whStock->stock_qty < $qty) {
-                    $wh = \App\Domains\Inventory\Models\Warehouse::find($warehouseId);
-                    $whName = $wh ? $wh->name : "Warehouse #{$warehouseId}";
+                $wh = \App\Domains\Inventory\Models\Warehouse::find($warehouseId);
+                $whName = $wh ? $wh->name : "Warehouse #{$warehouseId}";
+
+                if (! $whStock || $whStock->stock_qty < $qty) {
+                    $available = $whStock ? $whStock->stock_qty : 0;
                     throw new InsufficientStockException(
-                        "{$whName} has insufficient stock for '{$product->name}'. Available: {$whStock->stock_qty}, Requested: {$qty}."
+                        "{$whName} has insufficient stock for '{$product->name}'. Available: {$available}, Requested: {$qty}."
                     );
                 }
+            }
+
+            // 6. Atomically Apply Decrements across all locked entities
+            $product->decrement('stock', $qty);
+
+            if ($option) {
+                $option->decrement('stock', $qty);
+            }
+
+            if ($variant) {
+                $variant->decrement('stock', $qty);
+            }
+
+            if ($whStock) {
                 $whStock->decrement('stock_qty', $qty);
             }
-        }
 
-        // 6. Broadcast Real-Time Reverb WebSocket Event
-        event(new \App\Domains\Inventory\Events\StockUpdatedEvent($freshProduct, -$qty, 'SALE'));
+            $freshProduct = $product->fresh();
 
-        return $freshProduct;
+            // 7. Broadcast Real-Time Reverb WebSocket Event
+            event(new \App\Domains\Inventory\Events\StockUpdatedEvent($freshProduct, -$qty, 'SALE'));
+
+            return $freshProduct;
+        });
     }
 }

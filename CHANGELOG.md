@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Forensic Remediation Stage 2: Concurrency, Deadlocks & Inventory Integrity Hardening:**
+  - **Loyalty Points Redemption Monetary Valuation (BIZ-01):**
+    - `ProcessCheckoutAction`: Automatically values redeemed loyalty points (1 point = 100 MMK) and deducts the monetary value from `total_amount`, ensuring loyalty point redemption directly benefits customer payments.
+  - **Atomic Validation-First Inventory Deductions & Anti-Drift (BIZ-02):**
+    - `DeductStockAction`: Refactored into an atomic database transaction. Row locking and quantity checks across Master Product, Variants, and physical Warehouse stocks are strictly evaluated *before* any decrements occur, eliminating partial deductions and silent inventory drift.
+  - **Workshop Labor Service Itemized Line Invariant (BIZ-04):**
+    - `ConvertWorkOrderToInvoiceAction`: Added auto-fallback labor service product creation, ensuring itemized labor service lines are always generated in `sales_order_items`. Sum of item lines strictly equals order header `total_amount`.
+  - **Supplier Row Locking on Inbound Goods Receipt (CONC-01):**
+    - `ReceivePurchaseAction`: Explicitly locks supplier record (`lockForUpdate()`) before incrementing `outstanding_balance`, eliminating concurrent debt update collisions and deadlocks.
+  - **Automated Pest Feature Test Suite:**
+    - Authored `tests/Feature/Phase5ConcurrencyAndIntegrityHardeningTest.php`: 4 new feature tests verifying loyalty points price conversion, strict warehouse stock locking, workshop labor line item invariants, and supplier row locking.
+    - Repository Test Suite: **142 passed (717 assertions) — 100% pass rate in 8.83s**.
 - **Forensic Remediation Stage 1: Anti-Fraud, Shift Enforcement & Cash Integrity Hotfixes:**
   - **Discretionary Order Discount Authorization (CRIT-01):**
     - `ProcessCheckoutAction`: Enforces that non-zero order `discount_amount` must be authorized by a manager PIN, a staff token with `pos.applyDiscount` permission, or validated against an active promotion campaign code (`promotion_code`).

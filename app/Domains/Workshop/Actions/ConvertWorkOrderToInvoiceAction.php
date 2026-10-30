@@ -154,20 +154,34 @@ class ConvertWorkOrderToInvoiceAction
                 ]);
             }
 
-            // 7. If Labor fee exists, record labor item
+            // 7. If Labor fee exists, record itemized labor service line item
             if ((float) $workOrder->labor_fee > 0) {
                 $laborProduct = Product::where('is_labor', true)->first();
-                if ($laborProduct) {
-                    SalesOrderItem::create([
-                        'sales_order_id' => $salesOrder->id,
-                        'product_id' => $laborProduct->id,
+                if (! $laborProduct) {
+                    $category = \App\Domains\Inventory\Models\Category::first();
+                    $uom = \App\Domains\Inventory\Models\UnitOfMeasure::first();
+                    $laborProduct = Product::create([
+                        'category_id' => $category?->id ?? 1,
+                        'uom_id' => $uom?->id ?? 1,
                         'name' => 'Workshop Labor & Diagnostics',
-                        'qty' => 1,
-                        'unit_price' => $workOrder->labor_fee,
+                        'barcode' => 'LABOR-SERVICE-SYS',
+                        'sell_price' => 0.00,
                         'cost_price' => 0.00,
-                        'subtotal' => $workOrder->labor_fee,
+                        'stock' => 999999,
+                        'is_labor' => true,
                     ]);
                 }
+
+                SalesOrderItem::create([
+                    'sales_order_id' => $salesOrder->id,
+                    'product_id' => $laborProduct->id,
+                    'name' => 'Workshop Labor & Diagnostics',
+                    'qty' => 1,
+                    'unit_price' => $workOrder->labor_fee,
+                    'cost_price' => 0.00,
+                    'discount_amount' => 0.00,
+                    'subtotal' => $workOrder->labor_fee,
+                ]);
             }
 
             // 8. Record Multi-Tender Payment Splits

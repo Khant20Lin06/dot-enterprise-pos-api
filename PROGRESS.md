@@ -33,6 +33,7 @@
 | **Phase J** | Enterprise Accounting Integrity: Credit Overpayment Change, Supervisor POS Order Voiding & Scoped Held Carts | 🟢 Completed | 100% |
 | **Phase K** | Complete Domain Coverage: Activation of Orphan Models (Fleets, Mechanics, Outsourced Parts, Purchase Returns, Pricing) | 🟢 Completed | 100% |
 | **Phase L** | Forensic Remediation Stage 1: Anti-Fraud, Shift Enforcement & Cash Integrity Hotfixes | 🟢 Completed | 100% |
+| **Phase M** | Forensic Remediation Stage 2: Concurrency, Deadlocks & Inventory Integrity Hardening | 🟢 Completed | 100% |
 
 ---
 
@@ -402,3 +403,21 @@
 - [x] **Pest Feature Test Suite:**
   - `tests/Feature/Phase4SecurityAndFraudHotfixesTest.php`: 5 passed (33 assertions).
   - Full Test Suite: **138 passed (703 assertions) — 100% pass rate in 8.39s**.
+
+---
+
+### Phase M: Forensic Remediation Stage 2: Concurrency, Deadlocks & Inventory Integrity Hardening
+- [x] **Loyalty Points Redemption Price Reduction (BIZ-01):**
+  - Connected points burn to real monetary price discounts: 1 redeemed loyalty point = 100 MMK discount (`config('pos.point_redemption_rate')`).
+  - Total order amount reflects net payable total, and points are decremented accordingly with new points accrual on net payment.
+- [x] **Atomic Validation-First Inventory Deductions & Anti-Drift (BIZ-02):**
+  - Refactored `DeductStockAction` into an atomic `DB::transaction()` with validation-first row locking.
+  - Strictly verifies warehouse stock row presence and available quantity before performing any decrement operations, eliminating partial deductions and silent stock drift.
+- [x] **Workshop Labor Service Itemized Line Invariant (BIZ-04):**
+  - Hardened `ConvertWorkOrderToInvoiceAction` with auto-fallback labor service product creation, ensuring itemized labor service lines are always created in `sales_order_items`.
+  - Guarantees line-item subtotal sum strictly matches header `sales_orders.total_amount`.
+- [x] **Supplier Row Locking on Inbound Goods Receipt (CONC-01):**
+  - Hardened `ReceivePurchaseAction` to lock `suppliers` row (`lockForUpdate()`) before incrementing `outstanding_balance`, eliminating race conditions and lost updates on supplier debts.
+- [x] **Pest Feature Test Suite:**
+  - `tests/Feature/Phase5ConcurrencyAndIntegrityHardeningTest.php`: 4 passed (14 assertions).
+  - Full Test Suite: **142 passed (717 assertions) — 100% pass rate in 8.83s**.

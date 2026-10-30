@@ -86,9 +86,15 @@ class ReceivePurchaseAction
             // 3. Mark Purchase Order as Received
             $purchase->update(['status' => 'Received']);
 
-            // 4. Update Supplier Payable Debt
-            if ($purchase->supplier) {
-                $purchase->supplier->increment('outstanding_balance', (float) $purchase->total_amount);
+            // 4. Update Supplier Payable Debt with row locking
+            if ($purchase->supplier_id) {
+                $supplier = \App\Domains\Purchasing\Models\Supplier::where('id', $purchase->supplier_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($supplier) {
+                    $supplier->increment('outstanding_balance', (float) $purchase->total_amount);
+                }
             }
 
             // 5. Immutable Audit Log

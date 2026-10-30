@@ -184,6 +184,26 @@ class ProcessCheckoutAction
                 }
             }
 
+            // BIZ-01 Hardening: Points Redemption Monetary Valuation & Discount Deduction
+            $pointsRedeemed = (int) ($data['points_redeemed'] ?? 0);
+            $pointsDiscount = 0.00;
+
+            if ($pointsRedeemed > 0) {
+                if (! $customer) {
+                    throw new \InvalidArgumentException('Points redemption requires an identified customer account.');
+                }
+
+                if ($customer->loyalty_points < $pointsRedeemed) {
+                    throw new \InvalidArgumentException(
+                        "Customer has insufficient loyalty points. Available: {$customer->loyalty_points}, Requested: {$pointsRedeemed}."
+                    );
+                }
+
+                $pointMonetaryRate = (float) config('pos.point_redemption_rate', 100.0);
+                $pointsDiscount = round($pointsRedeemed * $pointMonetaryRate, 2);
+                $discountTotal += $pointsDiscount;
+            }
+
             $taxTotal = (float) ($data['tax_amount'] ?? 0.00);
             $totalAmount = max(0, round($calculatedSubtotal - $discountTotal + $taxTotal, 2));
 
@@ -261,16 +281,8 @@ class ProcessCheckoutAction
 
             // 5. Loyalty Points Accounting & Hardening 3: Underflow/Deficit Protection
             $pointsEarned = 0;
-            $pointsRedeemed = (int) ($data['points_redeemed'] ?? 0);
-
             if ($customer) {
-                if ($pointsRedeemed > 0 && $customer->loyalty_points < $pointsRedeemed) {
-                    throw new \InvalidArgumentException(
-                        "Customer has insufficient loyalty points. Available: {$customer->loyalty_points}, Requested: {$pointsRedeemed}."
-                    );
-                }
-
-                // Earn 1 point per 1,000 Ks
+                // Earn 1 point per 1,000 Ks on net payable total
                 $pointsEarned = (int) floor($totalAmount / 1000);
                 $netPointsChange = $pointsEarned - $pointsRedeemed;
                 $customer->increment('loyalty_points', $netPointsChange);
