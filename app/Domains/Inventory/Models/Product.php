@@ -29,6 +29,7 @@ class Product extends Model
         'image_url',
         'is_labor',
         'is_outsourced',
+        'has_variants',
     ];
 
     protected $casts = [
@@ -39,6 +40,7 @@ class Product extends Model
         'min_stock' => 'integer',
         'is_labor' => 'boolean',
         'is_outsourced' => 'boolean',
+        'has_variants' => 'boolean',
     ];
 
     public function category(): BelongsTo
@@ -74,6 +76,11 @@ class Product extends Model
     public function options(): HasMany
     {
         return $this->hasMany(ProductOption::class, 'product_id');
+    }
+
+    public function variants(): HasMany
+    {
+        return $this->hasMany(ProductVariant::class, 'product_id');
     }
 
     public function priceListItems(): HasMany

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AttributeController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CustomerCreditController;
 use App\Http\Controllers\Api\V1\PosController;
@@ -41,8 +42,20 @@ Route::prefix('v1')->group(function () {
         // Catalog & Inventory
         Route::prefix('products')->group(function () {
             Route::get('/', [ProductController::class, 'index']);
+            Route::get('/barcode/{barcode}', [ProductController::class, 'lookupBarcode']);
             Route::get('/{id}', [ProductController::class, 'show']);
             Route::post('/{id}/barcode', [ProductController::class, 'barcode']);
+            Route::get('/{id}/variants', [ProductController::class, 'variants']);
+            Route::post('/{id}/variants/matrix', [ProductController::class, 'generateMatrix'])
+                ->middleware('permission:inventory,create');
+        });
+
+        // Variant Attributes Master (Size, Color, etc.)
+        Route::prefix('attributes')->group(function () {
+            Route::get('/', [AttributeController::class, 'index']);
+            Route::post('/', [AttributeController::class, 'store'])
+                ->middleware('permission:inventory,create');
+            Route::get('/{id}', [AttributeController::class, 'show']);
         });
 
         // POS Operations & Orders

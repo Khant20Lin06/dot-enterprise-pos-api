@@ -147,7 +147,44 @@ erDiagram
   * `min_stock` (INT, DEFAULT 5) — Low stock threshold
   * `is_labor` (BOOLEAN, DEFAULT FALSE) — For service/repair labor charges
   * `is_outsourced` (BOOLEAN, DEFAULT FALSE)
+  * `has_variants` (BOOLEAN, DEFAULT FALSE) — Indicates multi-axis variants matrix exists
   * `created_at`, `updated_at` (TIMESTAMP)
+
+* **`attributes`** (Master Variant Attributes)
+  * `id` (BIGINT, PK, AUTO_INCREMENT)
+  * `code` (VARCHAR(50), UNIQUE, INDEX) — e.g. "SIZE", "COLOR"
+  * `name` (VARCHAR(100)) — e.g. "Clothing Size", "Color"
+  * `description` (VARCHAR(255), NULLABLE)
+  * `created_at`, `updated_at` (TIMESTAMP)
+
+* **`attribute_values`** (Discrete Attribute Options)
+  * `id` (BIGINT, PK, AUTO_INCREMENT)
+  * `attribute_id` (BIGINT, FK -> `attributes.id`, ON DELETE CASCADE)
+  * `value` (VARCHAR(100)) — e.g. "XL", "M", "Racing Red"
+  * `color_hex` (VARCHAR(20), NULLABLE) — Hex color code, e.g. "#EF4444"
+  * `sort_order` (INT, DEFAULT 0)
+  * `created_at`, `updated_at` (TIMESTAMP)
+  * UNIQUE (`attribute_id`, `value`)
+
+* **`product_variants`** (Multi-Dimensional SKU Permutations)
+  * `id` (BIGINT, PK, AUTO_INCREMENT)
+  * `product_id` (BIGINT, FK -> `products.id`, ON DELETE CASCADE)
+  * `sku` (VARCHAR(100), UNIQUE, INDEX) — Structured SKU, e.g. "OVERALL-S-RED"
+  * `barcode` (VARCHAR(100), UNIQUE, NULLABLE, INDEX) — Direct scanner barcode, e.g. "OVERALL-V001"
+  * `price` (DECIMAL(14,2))
+  * `cost_price` (DECIMAL(14,2), DEFAULT 0.00)
+  * `stock` (INT, DEFAULT 0) — Variant-specific stock level
+  * `image_url` (VARCHAR(255), NULLABLE)
+  * `is_active` (BOOLEAN, DEFAULT TRUE)
+  * `created_at`, `updated_at` (TIMESTAMP)
+  * INDEX (`product_id`, `is_active`)
+
+* **`variant_attribute_values`** (EAV Matrix Pivot)
+  * `id` (BIGINT, PK, AUTO_INCREMENT)
+  * `product_variant_id` (BIGINT, FK -> `product_variants.id`, ON DELETE CASCADE)
+  * `attribute_value_id` (BIGINT, FK -> `attribute_values.id`, ON DELETE CASCADE)
+  * `created_at`, `updated_at` (TIMESTAMP)
+  * UNIQUE (`product_variant_id`, `attribute_value_id`)
 
 * **`product_options`** (Variants)
   * `id` (BIGINT, PK, AUTO_INCREMENT)
@@ -310,6 +347,7 @@ erDiagram
   * `sales_order_id` (BIGINT, FK -> `sales_orders.id`, ON DELETE CASCADE)
   * `product_id` (BIGINT, FK -> `products.id`)
   * `product_option_id` (BIGINT, NULLABLE, FK -> `product_options.id`)
+  * `product_variant_id` (BIGINT, NULLABLE, FK -> `product_variants.id`, ON DELETE SET NULL)
   * `name` (VARCHAR(200))
   * `qty` (INT)
   * `unit_price` (DECIMAL(14,2))

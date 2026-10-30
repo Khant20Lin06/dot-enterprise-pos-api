@@ -13,6 +13,7 @@ class SalesOrderItem extends Model
         'sales_order_id',
         'product_id',
         'product_option_id',
+        'product_variant_id',
         'name',
         'qty',
         'unit_price',
@@ -42,5 +43,10 @@ class SalesOrderItem extends Model
     public function productOption(): BelongsTo
     {
         return $this->belongsTo(ProductOption::class, 'product_option_id');
+    }
+
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Inventory\Models\ProductVariant::class, 'product_variant_id');
     }
 }

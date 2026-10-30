@@ -54,12 +54,20 @@ class ProcessCheckoutAction
                 $productId = (int) $itemData['product_id'];
                 $qty = (int) ($itemData['qty'] ?? 1);
                 $optionId = isset($itemData['product_option_id']) ? (int) $itemData['product_option_id'] : null;
+                $variantId = isset($itemData['product_variant_id']) ? (int) $itemData['product_variant_id'] : (isset($itemData['variant_id']) ? (int) $itemData['variant_id'] : null);
+                $warehouseId = isset($data['warehouse_id']) ? (int) $data['warehouse_id'] : null;
 
                 // Pessimistic Row Locking in action
-                $product = $this->deductStockAction->execute($productId, $qty, $optionId);
+                $product = $this->deductStockAction->execute($productId, $qty, $optionId, $warehouseId, $variantId);
 
                 // Hardening 2: Server-Authoritative Price Validation (Anti-Price Tampering)
                 $catalogPrice = (float) ($product->sell_price ?: $product->retail_price);
+                if ($variantId) {
+                    $variant = \App\Domains\Inventory\Models\ProductVariant::find($variantId);
+                    if ($variant && (float) $variant->price > 0) {
+                        $catalogPrice = (float) $variant->price;
+                    }
+                }
                 $requestedPrice = isset($itemData['unit_price']) ? (float) $itemData['unit_price'] : $catalogPrice;
 
                 // Disallow unauthorized price reductions unless explicitly overridden
@@ -80,6 +88,7 @@ class ProcessCheckoutAction
                 $orderItemsPayload[] = [
                     'product_id' => $product->id,
                     'product_option_id' => $optionId,
+                    'product_variant_id' => $variantId,
                     'name' => $itemData['name'] ?? $product->name,
                     'qty' => $qty,
                     'unit_price' => $unitPrice,

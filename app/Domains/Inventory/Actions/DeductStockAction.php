@@ -13,7 +13,7 @@ class DeductStockAction
      *
      * @throws InsufficientStockException
      */
-    public function execute(int $productId, int $qty, ?int $productOptionId = null, ?int $warehouseId = null): Product
+    public function execute(int $productId, int $qty, ?int $productOptionId = null, ?int $warehouseId = null, ?int $productVariantId = null): Product
     {
         // 1. Lock Product Row for Update
         $product = Product::where('id', $productId)->lockForUpdate()->firstOrFail();
@@ -34,7 +34,7 @@ class DeductStockAction
         $product->decrement('stock', $qty);
         $freshProduct = $product->fresh();
 
-        // 4. If Variant Option provided, lock and deduct variant stock as well
+        // 4. If Legacy Variant Option provided, lock and deduct option stock as well
         if ($productOptionId) {
             $option = ProductOption::where('id', $productOptionId)
                 ->where('product_id', $productId)
@@ -48,6 +48,23 @@ class DeductStockAction
                     );
                 }
                 $option->decrement('stock', $qty);
+            }
+        }
+
+        // 4b. If Multi-Attribute Product Variant provided, lock and deduct variant stock as well
+        if ($productVariantId) {
+            $variant = \App\Domains\Inventory\Models\ProductVariant::where('id', $productVariantId)
+                ->where('product_id', $productId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($variant) {
+                if ($variant->stock < $qty) {
+                    throw new InsufficientStockException(
+                        "Variant '{$variant->sku}' has insufficient stock. Requested: {$qty}, Available: {$variant->stock}."
+                    );
+                }
+                $variant->decrement('stock', $qty);
             }
         }
 

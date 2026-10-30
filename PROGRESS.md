@@ -24,6 +24,7 @@
 | **Phase A** | Enterprise Sales Return & Refund Module (Migration, Action, API, Reverb) | 🟢 Completed | 100% |
 | **Phase B** | Roles & Staff Management CRUD API (RoleController, StaffController, Redis Cache) | 🟢 Completed | 100% |
 | **Phase C** | Multi-Warehouse & Multi-Branch Engine (Warehouses, Two-Step Transfers, Location Stocks) | 🟢 Completed | 100% |
+| **Phase D** | Product Variants: Size & Color EAV Matrix (Attributes Master, Cartesian Matrix, Barcode Resolution) | 🟢 Completed | 100% |
 
 ---
 
@@ -130,3 +131,32 @@
   - `daily_sales_summary.json`: AI real-time executive sales compilation
 - [x] Created Artisan CLI testing tool `php artisan pos:test {action}` for rapid developer & agent verification
 - [x] Full test suite verification: **32 passed (140 assertions) — 100% pass rate**
+
+---
+
+### Phase D: Product Variants (Size & Color EAV Matrix)
+- [x] Schema Migration: `2026_10_30_000011_create_product_attributes_and_variants_tables.php`
+  - Created `attributes` table (`id`, `code`, `name`, `description`).
+  - Created `attribute_values` table (`id`, `attribute_id`, `value`, `color_hex`, `sort_order`).
+  - Created `product_variants` table (`id`, `product_id`, `sku`, `barcode`, `price`, `cost_price`, `stock`, `is_active`).
+  - Created `variant_attribute_values` pivot table (`product_variant_id`, `attribute_value_id`).
+  - Added `has_variants` boolean flag to `products`.
+  - Added `product_variant_id` foreign key to `sales_order_items`.
+- [x] Eloquent Models with Strict Relationships:
+  - `Attribute`: `hasMany(AttributeValue::class)`
+  - `AttributeValue`: `belongsTo(Attribute::class)`, `belongsToMany(ProductVariant::class)`
+  - `ProductVariant`: `belongsTo(Product::class)`, `belongsToMany(AttributeValue::class)`
+  - `Product`: `hasMany(ProductVariant::class)`, `has_variants` casting
+  - `SalesOrderItem`: `belongsTo(ProductVariant::class, 'product_variant_id')`
+- [x] Domain Business Actions:
+  - `CreateAttributeAction`: Validates attribute uniqueness and creates nested values with sort order.
+  - `GenerateVariantMatrixAction`: Computes Cartesian product permutations across N-axes of attributes, produces structured SKUs (`{barcode}-{SIZE}-{COLOR}`), assigns unique barcodes, and synchronizes master product stock (`products.stock = sum(variants.stock)`).
+  - `ResolveBarcodeAction`: Ultra-fast dual-resolution scanner prioritizing variant barcodes and SKUs, falling back to master product barcodes.
+  - `DeductStockAction`: Enhanced to support row-locking deduction on specific `ProductVariant` rows alongside master inventory.
+  - `ProcessCheckoutAction`: Seamlessly records `product_variant_id` on `sales_order_items` and deducts variant stock with concurrency-safe locking.
+- [x] RESTful API Endpoints & Resources:
+  - `AttributeController`: `GET /api/v1/attributes`, `POST /api/v1/attributes`, `GET /api/v1/attributes/{id}`.
+  - `ProductController` variant extensions: `GET /api/v1/products/{id}/variants`, `POST /api/v1/products/{id}/variants/matrix`, `GET /api/v1/products/barcode/{barcode}`.
+- [x] Pest Feature Test Suite:
+  - `tests/Feature/ProductVariantMatrixTest.php`: 6 passed (51 assertions).
+  - Full Test Suite: **72 passed (364 assertions) — 100% pass rate in 4.50s**.

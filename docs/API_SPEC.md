@@ -93,12 +93,41 @@
 }
 ```
 
-### 2.2. Barcode Lookup (Ultra-Fast for POS Scanner)
+### 2.2. Barcode Lookup (Ultra-Fast Dual Resolution for Scanner)
 * **Endpoint:** `GET /products/barcode/{barcode}`
-* **Response (200 OK):**
+* **Response (Variant Match - 200 OK):**
 ```json
 {
   "success": true,
+  "type": "variant",
+  "data": {
+    "id": 12,
+    "productId": 101,
+    "sku": "OVERALL-S-RED",
+    "barcode": "OVERALL-V001",
+    "price": 38000.00,
+    "costPrice": 18000.00,
+    "stock": 10,
+    "isActive": true,
+    "attributes": [
+      { "attributeId": 1, "attributeCode": "SIZE", "attributeName": "Size", "valueId": 1, "value": "S" },
+      { "attributeId": 2, "attributeCode": "COLOR", "attributeName": "Color", "valueId": 4, "value": "Red", "colorHex": "#EF4444" }
+    ]
+  },
+  "product": {
+    "id": 101,
+    "name": "Enterprise Mechanic Overall",
+    "barcode": "OVERALL-101",
+    "sell_price": 35000.00,
+    "stock": 40
+  }
+}
+```
+* **Response (Master Product Match - 200 OK):**
+```json
+{
+  "success": true,
+  "type": "product",
   "data": {
     "id": 101,
     "name": "Total Quartz 9000 5W-30 (4L)",
@@ -106,6 +135,73 @@
     "sell_price": 58000.00,
     "stock": 24
   }
+}
+```
+
+### 2.3. Get Product Variants
+* **Endpoint:** `GET /products/{id}/variants`
+* **Response (200 OK):**
+```json
+{
+  "success": true,
+  "productId": 101,
+  "hasVariants": true,
+  "data": [
+    {
+      "id": 12,
+      "productId": 101,
+      "sku": "OVERALL-S-RED",
+      "barcode": "OVERALL-V001",
+      "price": 38000.00,
+      "costPrice": 18000.00,
+      "stock": 10,
+      "isActive": true,
+      "attributes": [
+        { "attributeId": 1, "attributeCode": "SIZE", "valueId": 1, "value": "S" },
+        { "attributeId": 2, "attributeCode": "COLOR", "valueId": 4, "value": "Red", "colorHex": "#EF4444" }
+      ]
+    }
+  ]
+}
+```
+
+### 2.4. Generate Cartesian Variant Matrix
+* **Endpoint:** `POST /products/{id}/variants/matrix`
+* **Permissions:** `inventory,create`
+* **Request Body:**
+```json
+{
+  "attribute_value_ids": [1, 2, 4, 5],
+  "price": 38000.00,
+  "cost_price": 18000.00,
+  "initial_stock": 10
+}
+```
+* **Response (201 Created):**
+```json
+{
+  "success": true,
+  "message": "4 variants generated successfully for product 'Enterprise Mechanic Overall'.",
+  "productId": 101,
+  "data": [ ... ]
+}
+```
+
+### 2.5. Variant Attributes Master (Size, Color, etc.)
+* **Endpoints:**
+  * `GET /attributes` — List all attributes and discrete values
+  * `POST /attributes` — Create attribute with values (`permission:inventory,create`)
+  * `GET /attributes/{id}` — Retrieve specific attribute details
+* **Request Body (`POST /attributes`):**
+```json
+{
+  "code": "COLOR",
+  "name": "Color",
+  "description": "Visual color swatch attribute",
+  "values": [
+    { "value": "Navy Blue", "color_hex": "#000080", "sort_order": 1 },
+    { "value": "Crimson Red", "color_hex": "#DC2626", "sort_order": 2 }
+  ]
 }
 ```
 

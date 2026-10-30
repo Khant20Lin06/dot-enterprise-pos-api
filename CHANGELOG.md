@@ -8,6 +8,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Phase D Implementation: Product Variants (Size & Color EAV Matrix):**
+  - **Database Migration (`2026_10_30_000011_create_product_attributes_and_variants_tables.php`):**
+    - `attributes`: Master attributes catalog (`id`, `code`, `name`, `description`).
+    - `attribute_values`: Discrete values (`id`, `attribute_id`, `value`, `color_hex`, `sort_order`).
+    - `product_variants`: Multi-dimensional SKU variants (`id`, `product_id`, `sku`, `barcode`, `price`, `cost_price`, `stock`, `is_active`).
+    - `variant_attribute_values`: Many-to-many pivot associating variant rows with exact attribute combinations.
+    - Added `has_variants` boolean to `products` master table.
+    - Added `product_variant_id` foreign key with `onDelete('set null')` to `sales_order_items`.
+  - **Domain Models & Relationships (`Attribute`, `AttributeValue`, `ProductVariant`):**
+    - Strictly typed Eloquent models with bi-directional relationships and casts.
+    - Linked `Product->variants()` and `SalesOrderItem->variant()`.
+  - **Domain Actions:**
+    - `CreateAttributeAction`: Validates attribute uniqueness, creates attribute and nested attribute values with custom hex colors and sort order.
+    - `GenerateVariantMatrixAction`: Cartesian product combination algorithm generating permutations across N attribute axes, creates structured SKUs (`{barcode}-{SIZE}-{COLOR}`), assigns unique variant barcodes (`{barcode}-V001`), and maintains master stock synchronization (`products.stock = sum(variants.stock)`).
+    - `ResolveBarcodeAction`: Real-time barcode/SKU resolver with primary lookup against active `ProductVariant` barcodes and SKUs, falling back to master `Product` barcodes.
+    - `DeductStockAction`: Enhanced with `$productVariantId`, locking variant rows via `lockForUpdate()` and preventing negative inventory overselling.
+    - `ProcessCheckoutAction`: Automatically tracks `product_variant_id` on invoice items, resolves variant prices, and coordinates variant row-level stock deduction.
+  - **API Layer:**
+    - FormRequests: `CreateAttributeRequest`, `GenerateVariantMatrixRequest`.
+    - JsonResources: `AttributeResource`, `ProductVariantResource`.
+    - RESTful Controllers:
+      - `AttributeController`: `GET /api/v1/attributes`, `POST /api/v1/attributes`, `GET /api/v1/attributes/{id}`.
+      - `ProductController` additions: `GET /api/v1/products/{id}/variants`, `POST /api/v1/products/{id}/variants/matrix`, `GET /api/v1/products/barcode/{barcode}`.
+  - **Automated Feature Test Suite (`tests/Feature/ProductVariantMatrixTest.php`):**
+    - 6 comprehensive tests asserting attribute creation, matrix generation, master stock synchronization, barcode lookup, POS checkout deduction, and oversell prevention.
+    - Overall test suite status: **72 passed (364 assertions) — 100% pass rate in 4.50s**.
 - **Phase C Implementation: Multi-Warehouse & Multi-Branch Engine:**
   - **Database Migrations (`warehouses`, `warehouse_stocks`, `stock_transfers`, `stock_transfer_items`):**
     - `warehouses`: Physical branch locations, distribution hubs, workshop bays with central flags.
