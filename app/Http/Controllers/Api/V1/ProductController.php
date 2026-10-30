@@ -50,6 +50,12 @@ class ProductController extends Controller
             $query->where('stock', '>', 0);
         }
 
+        if ($request->boolean('trashed')) {
+            $query->onlyTrashed();
+        } elseif ($request->boolean('with_trashed')) {
+            $query->withTrashed();
+        }
+
         if ($request->boolean('is_labor')) {
             $query->where('is_labor', true);
         } elseif ($request->has('is_labor') && ! $request->boolean('is_labor')) {
@@ -201,6 +207,21 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Product deleted successfully.',
+        ]);
+    }
+
+    /**
+     * Restore a soft-deleted product (Enterprise Asset Recovery).
+     */
+    public function restore(int $id): JsonResponse
+    {
+        $product = Product::onlyTrashed()->findOrFail($id);
+        $product->restore();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Product '{$product->name}' restored successfully.",
+            'data' => new ProductResource($product->load(['category', 'unitOfMeasure'])),
         ]);
     }
 

@@ -44,6 +44,11 @@ class StaffUser extends Authenticatable
         return $this->hasMany(AuditLog::class, 'staff_id');
     }
 
+    public function hasRole(string $code): bool
+    {
+        return $this->role?->code === $code;
+    }
+
     public function hasPermission(string $module, string $action): bool
     {
         if (! $this->role_id) {

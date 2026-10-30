@@ -27,6 +27,8 @@ class PurchaseResource extends JsonResource
                     'productId' => $item->product_id,
                     'productName' => $item->product?->name,
                     'qty' => (int) $item->qty,
+                    'receivedQty' => (int) $item->received_qty,
+                    'pendingQty' => max(0, (int) $item->qty - (int) $item->received_qty),
                     'unitPrice' => (float) $item->unit_price,
                     'subtotal' => (float) $item->subtotal,
                 ];

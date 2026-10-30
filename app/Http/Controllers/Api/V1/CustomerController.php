@@ -40,6 +40,12 @@ class CustomerController extends Controller
             $query->where('fleet_id', $request->query('fleet_id'));
         }
 
+        if ($request->boolean('trashed')) {
+            $query->onlyTrashed();
+        } elseif ($request->boolean('with_trashed')) {
+            $query->withTrashed();
+        }
+
         $perPage = min((int) $request->query('per_page', 20), 100);
         $customers = $query->orderByDesc('due_amount')->latest('id')->paginate($perPage);
 
@@ -128,6 +134,21 @@ class CustomerController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Customer deleted successfully.',
+        ]);
+    }
+
+    /**
+     * Restore a soft-deleted customer (Enterprise Asset Recovery).
+     */
+    public function restore(int $id): JsonResponse
+    {
+        $customer = Customer::onlyTrashed()->findOrFail($id);
+        $customer->restore();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Customer '{$customer->name}' restored successfully.",
+            'data' => new CustomerResource($customer),
         ]);
     }
 }

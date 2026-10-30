@@ -44,11 +44,41 @@ class PosController extends Controller
     }
 
     /**
-     * List historical sales orders with filters.
+     * List historical sales orders with filters and branch/cashier scoping (OWASP API1:2023 BOLA Defense).
      */
     public function orders(Request $request): AnonymousResourceCollection
     {
+        $user = $request->user();
+        $isSupervisor = $user && ($user->hasRole('ADMIN') || $user->hasPermission('settings', 'manageRoles') || $user->hasPermission('pos', 'viewAllBranches'));
+
         $query = SalesOrder::with(['customer', 'vehicle', 'cashier', 'items.product', 'payments']);
+
+        // Multi-Branch BOLA Scoping: Regular cashiers only see orders from their active shift session or their own sales
+        if (! $isSupervisor) {
+            $activeSession = PosSession::where('cashier_id', $user->id)
+                ->where('status', 'open')
+                ->latest('id')
+                ->first();
+
+            if ($activeSession) {
+                $query->where('pos_session_id', $activeSession->id);
+            } else {
+                $query->where('cashier_id', $user->id);
+            }
+        } else {
+            // Enterprise supervisors can filter across warehouses or cashiers
+            if ($request->filled('warehouse_id')) {
+                $query->whereHas('posSession', fn ($q) => $q->where('warehouse_id', $request->query('warehouse_id')));
+            }
+
+            if ($request->filled('cashier_id')) {
+                $query->where('cashier_id', $request->query('cashier_id'));
+            }
+
+            if ($request->filled('pos_session_id')) {
+                $query->where('pos_session_id', $request->query('pos_session_id'));
+            }
+        }
 
         if ($request->filled('customer_id')) {
             $query->where('customer_id', $request->query('customer_id'));
@@ -69,11 +99,31 @@ class PosController extends Controller
     }
 
     /**
-     * Get single sales order details.
+     * Get single sales order details with BOLA branch-level authorization check.
      */
-    public function showOrder(int $id): JsonResponse
+    public function showOrder(Request $request, int $id): JsonResponse
     {
+        $user = $request->user();
+        $isSupervisor = $user && ($user->hasRole('ADMIN') || $user->hasPermission('settings', 'manageRoles') || $user->hasPermission('pos', 'viewAllBranches'));
+
         $order = SalesOrder::with(['customer', 'vehicle', 'cashier', 'items.product', 'payments'])->findOrFail($id);
+
+        if (! $isSupervisor) {
+            $activeSession = PosSession::where('cashier_id', $user->id)
+                ->where('status', 'open')
+                ->latest('id')
+                ->first();
+
+            $isOwnOrder = ($activeSession && $order->pos_session_id === $activeSession->id) || $order->cashier_id === $user->id;
+
+            if (! $isOwnOrder) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You do not have authorization to view sales orders outside your assigned branch counter session.',
+                    'error_code' => 'BOLA_UNAUTHORIZED_BRANCH_ACCESS',
+                ], 403);
+            }
+        }
 
         return response()->json([
             'success' => true,

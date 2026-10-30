@@ -6,9 +6,11 @@ use App\Domains\Inventory\Models\Product;
 use App\Domains\Workshop\Models\OutsourcedPart;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Supplier extends Model
 {
+    use SoftDeletes;
     protected $fillable = [
         'name',
         'phone',

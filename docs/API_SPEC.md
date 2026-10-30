@@ -1539,3 +1539,113 @@ To eliminate catastrophic unhandled 500 SQL Integrity Constraint errors and pres
   * When dispatched (`POST /stock-transfers/{id}/dispatch`): Variant row is locked (`lockForUpdate()`), stock verified (`variant.stock >= qty`), and decremented from source.
   * When received (`POST /stock-transfers/{id}/receive`): Destination increments both warehouse stock and variant inventory balance.
   * When cancelled (`POST /stock-transfers/{id}/cancel`): Dispatched variant inventory is safely reverted to source warehouse.
+
+---
+
+## 17. Stage 6: Enterprise Scale & Partial GRN Engine
+
+### 17.1. POS Orders Multi-Branch Scoping & BOLA Defense (OWASP API1:2023)
+* **Endpoints:** `GET /pos/orders` & `GET /pos/orders/{id}`
+* **Permissions:** `pos,view` or `pos,create`
+* **Access Rules:**
+  * **Cashiers (`CASHIER`):** Scoped strictly to orders originating from their current active shift session (`pos_session_id`) or created by their own user ID. Hides cross-branch revenue, customer PII, and sales volumes.
+  * **Managers & Supervisors (`ADMIN`, `SUPERVISOR`):** Granted enterprise nationwide visibility across all branch outlets with optional query parameters:
+    * `?warehouse_id=2` — Filter by physical outlet/warehouse.
+    * `?cashier_id=5` — Filter by operator.
+    * `?pos_session_id=12` — Filter by counter shift session.
+* **BOLA Defense Violation (403 Forbidden):**
+  * When a cashier attempts to inspect an order belonging to a different branch via `GET /pos/orders/{id}`:
+```json
+{
+  "success": false,
+  "message": "Access denied: You are not authorized to view orders from other branches.",
+  "error_code": "BOLA_UNAUTHORIZED_BRANCH_ACCESS"
+}
+```
+
+### 17.2. Partial Goods Receipt (GRN) Engine
+* **Endpoint:** `POST /purchases/{id}/receive`
+* **Permissions:** `purchases,edit`
+* **Request Body (Partial Deliveries):**
+```json
+{
+  "warehouse_id": 1,
+  "items": [
+    {
+      "purchase_item_id": 10,
+      "received_qty": 6
+    },
+    {
+      "purchase_item_id": 11,
+      "received_qty": 15
+    }
+  ]
+}
+```
+* **Request Body (Full Delivery Shortcut):**
+  * Sending an empty payload `{}` automatically receives all remaining pending quantities across all line items.
+* **Response Payload (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Purchase goods received successfully.",
+  "data": {
+    "id": 4,
+    "po_number": "PO-2026-0004",
+    "status": "Partially Received",
+    "total_amount": 1250000.0,
+    "items": [
+      {
+        "id": 10,
+        "product_id": 42,
+        "quantity": 10,
+        "received_qty": 6,
+        "pending_qty": 4,
+        "unit_cost": 50000.0,
+        "subtotal": 500000.0
+      }
+    ]
+  }
+}
+```
+* **Enterprise Accounting & Inventory Rules:**
+  * **Pessimistic Row Locks:** Warehouse stock rows are locked (`lockForUpdate()`) and incremented strictly by `received_qty`.
+  * **Moving Average Cost (MAC):** Re-evaluated proportionally strictly against the received delta quantity, not the total PO quantity.
+  * **Supplier AP Balance:** Incremented strictly by the received dollar value (`received_qty * unit_cost`).
+  * **Status Transitions:** Sets status to `Partially Received` if `pending_qty > 0` on any line item, or `Received` once all items are 100% fulfilled.
+
+### 17.3. Executive Report Caching & DoS Throttling
+* **Endpoint:** `GET /reports/daily-summary`
+* **Permissions:** `reports,view`
+* **Query Parameters:**
+  * `date` (string, optional): Format `YYYY-MM-DD` (defaults to today).
+  * `fresh` (boolean, optional): Supervisor cache-busting flag (bypasses Redis/cache layer).
+* **Rate Limiting:** `30 requests per minute` (`throttle:30,1`).
+* **Cache Headers:**
+  * `X-Report-Cache: HIT` (served from 60s TTL memory cache).
+  * `X-Report-Cache: MISS` (freshly computed from database ledger).
+
+### 17.4. Master Data SoftDeletes & Disaster Recovery API
+* **Resources Supported:** `products`, `customers`, `suppliers`, `vehicles`.
+* **Trashed Records Filter:**
+  * `GET /products?trashed=true`
+  * `GET /customers?trashed=true`
+  * `GET /suppliers?trashed=true`
+  * `GET /vehicles?trashed=true`
+* **Restoration Endpoints:**
+  * `POST /products/{id}/restore`
+  * `POST /customers/{id}/restore`
+  * `POST /suppliers/{id}/restore`
+  * `POST /vehicles/{id}/restore`
+* **Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Product restored successfully.",
+  "data": {
+    "id": 12,
+    "name": "Brembo Racing Brake Pad",
+    "deleted_at": null
+  }
+}
+```

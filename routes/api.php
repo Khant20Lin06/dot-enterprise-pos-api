@@ -80,6 +80,8 @@ Route::prefix('v1')->group(function () {
                 ->middleware('permission:inventory,edit');
             Route::delete('/{id}', [ProductController::class, 'destroy'])
                 ->middleware('permission:inventory,edit');
+            Route::post('/{id}/restore', [ProductController::class, 'restore'])
+                ->middleware('permission:inventory,edit');
             Route::post('/{id}/barcode', [ProductController::class, 'barcode'])
                 ->middleware('permission:inventory,view');
             Route::get('/{id}/variants', [ProductController::class, 'variants'])
@@ -286,6 +288,8 @@ Route::prefix('v1')->group(function () {
                 ->middleware('permission:workshop,edit');
             Route::delete('/{id}', [VehicleController::class, 'destroy'])
                 ->middleware('permission:workshop,edit');
+            Route::post('/{id}/restore', [VehicleController::class, 'restore'])
+                ->middleware('permission:workshop,edit');
             Route::get('/{id}/compatible-parts', [VehicleFitmentController::class, 'compatibleParts'])
                 ->middleware('permission:workshop,view');
         });
@@ -303,6 +307,8 @@ Route::prefix('v1')->group(function () {
             Route::put('/{id}', [CustomerController::class, 'update'])
                 ->middleware('permission:pos,edit');
             Route::delete('/{id}', [CustomerController::class, 'destroy'])
+                ->middleware('permission:settings,manageRoles');
+            Route::post('/{id}/restore', [CustomerController::class, 'restore'])
                 ->middleware('permission:settings,manageRoles');
             Route::post('/{id}/settle-credit', [CustomerCreditController::class, 'settleCredit'])
                 ->middleware('permission:finances,approveCreditLimit');
@@ -324,10 +330,10 @@ Route::prefix('v1')->group(function () {
                 ->middleware('permission:settings,manageRoles');
         });
 
-        // Executive Reports & Analytics (Restricted to Finance/Admin)
+        // Executive Reports & Analytics (Restricted to Finance/Admin with DoS Throttling)
         Route::prefix('reports')->group(function () {
             Route::get('/daily-summary', [ReportController::class, 'dailySummary'])
-                ->middleware('permission:finances,view');
+                ->middleware(['throttle:30,1', 'permission:finances,view']);
         });
 
         // Roles & Permissions Management (Restricted to settings.manageRoles)
@@ -403,6 +409,8 @@ Route::prefix('v1')->group(function () {
             Route::put('/{id}', [SupplierController::class, 'update'])
                 ->middleware('permission:purchases,edit');
             Route::delete('/{id}', [SupplierController::class, 'destroy'])
+                ->middleware('permission:purchases,edit');
+            Route::post('/{id}/restore', [SupplierController::class, 'restore'])
                 ->middleware('permission:purchases,edit');
         });
 

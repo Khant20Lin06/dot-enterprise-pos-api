@@ -183,8 +183,8 @@ it('manages categories and units of measure with integrity guards against in-use
     $blockUomDelete->assertStatus(422)
         ->assertJsonFragment(['success' => false]);
 
-    // Delete product, then delete Category & UOM successfully
-    $product->delete();
+    // Delete product permanently, then delete Category & UOM successfully
+    $product->forceDelete();
 
     $this->deleteJson("/api/v1/categories/{$catId}")->assertStatus(200);
     $this->deleteJson("/api/v1/units-of-measure/{$uomId}")->assertStatus(200);

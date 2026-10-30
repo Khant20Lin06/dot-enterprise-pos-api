@@ -7,6 +7,7 @@ use App\Domains\Purchasing\Models\Purchase;
 use App\Domains\Purchasing\Models\PurchaseItem;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\CreatePurchaseRequest;
+use App\Http\Requests\V1\ReceivePurchaseRequest;
 use App\Http\Requests\V1\UpdatePurchaseRequest;
 use App\Http\Resources\V1\PurchaseResource;
 use App\Services\AtomicSequenceService;
@@ -183,19 +184,24 @@ class PurchaseController extends Controller
     }
 
     /**
-     * Receive goods from purchase order into inventory (GRN).
+     * Receive goods from purchase order into inventory (GRN, supporting partial or full receipts).
      */
-    public function receive(int $id, Request $request, ReceivePurchaseAction $action): JsonResponse
+    public function receive(int $id, ReceivePurchaseRequest $request, ReceivePurchaseAction $action): JsonResponse
     {
         $warehouseId = $request->input('warehouse_id');
         $operatorId = $request->user()?->id;
+        $items = $request->input('items');
 
         try {
-            $purchase = $action->execute($id, $warehouseId, $operatorId);
+            $purchase = $action->execute($id, $warehouseId, $operatorId, $items);
+
+            $msg = $purchase->status === 'Partially Received'
+                ? "Partial goods receipt for PO #{$purchase->po_no} recorded into inventory."
+                : "Goods for PO #{$purchase->po_no} received completely into inventory.";
 
             return response()->json([
                 'success' => true,
-                'message' => "Goods for PO #{$purchase->po_no} received successfully into inventory.",
+                'message' => $msg,
                 'data' => new PurchaseResource($purchase),
             ]);
         } catch (DomainException $e) {

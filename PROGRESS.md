@@ -38,6 +38,7 @@
 | **Phase O** | OWASP Top 10 API Security & ASVS Standard Implementation (Headers, XSS Disarm, Progressive Lockout, Error Sanitization) | 🟢 Completed | 100% |
 | **Phase P** | Stage 4: Anti-Destruction & Accounting Safeguards (Cascade Delete Prevention, Master Relational Guards, WH Stock Invariant, Sales Return Idempotency) | 🟢 Completed | 100% |
 | **Phase Q** | Stage 5: CRUD Matrix Completion & Variant Alignment (Attributes, Values, Fitment, UOM, RTV Lifecycle, Stock Transfer Variants) | 🟢 Completed | 100% |
+| **Phase R** | Stage 6: Enterprise Scale & Partial GRN Engine (BOLA Scoping, Partial Deliveries, Report Cache, SoftDeletes) | 🟢 Completed | 100% |
 
 ---
 
@@ -523,3 +524,34 @@
 - [x] **Pest Feature Test Suite:**
   - Authored `tests/Feature/Phase9CrudMatrixAndVariantAlignmentTest.php`: 6 passed (62 assertions).
   - Full Test Suite: **165 passed (941 assertions) — 100% pass rate in 11.78s**.
+
+---
+
+### Phase R: Forensic Remediation Stage 6: Enterprise Scale & Partial GRN Engine
+- [x] **Multi-Branch POS Orders Scoping (OWASP API1:2023 BOLA Defense):**
+  - Updated `PosController::orders`: Restricted cashier role strictly to orders from their active shift session (`pos_session_id`) or created by their user ID. Supervisors and administrators have multi-branch oversight with `warehouse_id`, `cashier_id`, or `pos_session_id` query filters.
+  - Hardened `PosController::showOrder`: Added strict BOLA check blocking cashiers from viewing sales orders from different branches/warehouses, returning `403 Forbidden` (`BOLA_UNAUTHORIZED_BRANCH_ACCESS`).
+- [x] **Partial Goods Receipt (GRN) Engine & Moving Average Costing:**
+  - Added migration `database/migrations/2026_10_30_000018_stage6_enterprise_scale_and_partial_grn.php` adding `received_qty` to `purchase_items`.
+  - Created `ReceivePurchaseRequest` with validation for batch line items (`items.*.purchase_item_id`, `items.*.received_qty`).
+  - Completely refactored `ReceivePurchaseAction` to eliminate the "all-or-nothing" procurement trap:
+    - Atomically increments physical stock (`warehouse_stocks` & `products.stock`) strictly by received batch quantity using pessimistic row locks.
+    - Re-evaluates Moving Average Cost proportionally based strictly on delivered batch volume.
+    - Credits supplier AP balance (`outstanding_balance`) strictly for the delivered batch amount (`batchQty * unit_cost`).
+    - Updates `received_qty` on purchase line items and automatically computes pending balances.
+    - Sets purchase order status to `Partially Received` if pending items remain, or `Received` once all line items are fulfilled.
+  - Updated `PurchaseResource` exposing `receivedQty` and `pendingQty`.
+- [x] **Executive Report Caching & DoS Defense:**
+  - Integrated `Cache::remember` with 60-second TTL on `ReportController::dailySummary` (`reports:daily-summary:{date}`).
+  - Added supervisor/admin cache-busting bypass (`?fresh=true`).
+  - Injected response header `X-Report-Cache: HIT` or `MISS`.
+  - Added API route rate limiting `throttle:30,1` on `GET /reports/daily-summary`.
+- [x] **Enterprise Asset Recovery: SoftDeletes Master Data Rollout:**
+  - Added soft deletes (`deleted_at`) to `products`, `customers`, `suppliers`, and `vehicles` in migration `2026_10_30_000018_stage6_enterprise_scale_and_partial_grn.php`.
+  - Added `SoftDeletes` trait to `Product`, `Customer`, `Supplier`, and `Vehicle` models.
+  - Hardened parent delete guards in `CategoryController` and `UnitOfMeasureController` with `withTrashed()` to prevent SQL foreign key errors on soft-deleted children.
+  - Implemented `restore(int $id)` methods and `trashed=true` listing filters on `ProductController`, `CustomerController`, `SupplierController`, and `VehicleController`.
+  - Registered restore routes: `POST /products/{id}/restore`, `POST /customers/{id}/restore`, `POST /suppliers/{id}/restore`, `POST /vehicles/{id}/restore`.
+- [x] **Pest Feature Test Suite:**
+  - Authored `tests/Feature/Phase10EnterpriseScaleAndPartialGrnTest.php`: 5 passed (60 assertions).
+  - Full Test Suite: **170 passed (1001 assertions) — 100% pass rate in 18.37s**.

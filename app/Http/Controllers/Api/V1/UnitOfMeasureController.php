@@ -79,10 +79,10 @@ class UnitOfMeasureController extends Controller
     {
         $unit = UnitOfMeasure::findOrFail($id);
 
-        if ($unit->products()->exists() || $unit->uomConversions()->exists()) {
+        if ($unit->products()->withTrashed()->exists() || $unit->uomConversions()->exists()) {
             return response()->json([
                 'success' => false,
-                'message' => "Cannot delete Unit of Measure '{$unit->name}'. It is currently assigned to products or packaging conversions.",
+                'message' => "Cannot delete Unit of Measure '{$unit->name}'. It is currently assigned to active or archived products, or packaging conversions.",
             ], 422);
         }
 

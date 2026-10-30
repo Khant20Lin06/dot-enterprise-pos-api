@@ -38,6 +38,12 @@ class VehicleController extends Controller
             $query->where('fleet_id', $request->query('fleet_id'));
         }
 
+        if ($request->boolean('trashed')) {
+            $query->onlyTrashed();
+        } elseif ($request->boolean('with_trashed')) {
+            $query->withTrashed();
+        }
+
         $perPage = min((int) $request->query('per_page', 20), 100);
         $vehicles = $query->latest('id')->paginate($perPage);
 
@@ -112,6 +118,21 @@ class VehicleController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Vehicle deleted successfully.',
+        ]);
+    }
+
+    /**
+     * Restore a soft-deleted vehicle (Enterprise Asset Recovery).
+     */
+    public function restore(int $id): JsonResponse
+    {
+        $vehicle = Vehicle::onlyTrashed()->findOrFail($id);
+        $vehicle->restore();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Vehicle '{$vehicle->plate_number}' restored successfully.",
+            'data' => new VehicleResource($vehicle->load('customer')),
         ]);
     }
 }

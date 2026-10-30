@@ -8,6 +8,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Stage 6: Enterprise Scale & Partial GRN Engine (Forensic Remediation):**
+  - **Multi-Branch POS Orders Scoping & BOLA Defense (OWASP API1:2023):**
+    - `PosController::orders`: Restricted cashier role strictly to orders belonging to their active shift session (`pos_session_id`) or created by their user ID. Supervisors and administrators retain cross-branch visibility with `warehouse_id`, `cashier_id`, or `pos_session_id` query filters.
+    - `PosController::showOrder`: Added authorization check blocking cashiers from viewing sales orders from different branches/warehouses, returning `403 Forbidden` (`BOLA_UNAUTHORIZED_BRANCH_ACCESS`).
+  - **Partial Goods Receipt (GRN) Engine & Moving Average Costing:**
+    - Migration `database/migrations/2026_10_30_000018_stage6_enterprise_scale_and_partial_grn.php` adding `received_qty` to `purchase_items`.
+    - Created `ReceivePurchaseRequest` with validation for itemized partial delivery batches (`items.*.purchase_item_id`, `items.*.received_qty`).
+    - Completely refactored `ReceivePurchaseAction` to eliminate the "all-or-nothing" procurement trap:
+      - Atomically increments physical stock (`warehouse_stocks` & `products.stock`) strictly by received batch quantity under pessimistic row locks.
+      - Re-evaluates Moving Average Cost proportionally based strictly on delivered batch volume.
+      - Credits supplier AP balance (`outstanding_balance`) strictly for the delivered batch amount (`batchQty * unit_cost`).
+      - Updates `received_qty` on purchase line items and automatically computes pending balances.
+      - Automatically transitions purchase order status between `Partially Received` and `Received`.
+    - Updated `PurchaseResource` exposing `receivedQty` and `pendingQty` per line item.
+  - **Executive Report Caching & DoS Defense:**
+    - Integrated `Cache::remember` with 60-second TTL on `ReportController::dailySummary` (`reports:daily-summary:{date}`).
+    - Added supervisor/admin cache-busting bypass (`?fresh=true`).
+    - Injected response header `X-Report-Cache: HIT` or `MISS`.
+    - Added route-level rate limiting `throttle:30,1` on `GET /reports/daily-summary`.
+  - **Enterprise Asset Recovery: SoftDeletes Master Data Rollout:**
+    - Added soft deletes (`deleted_at`) to `products`, `customers`, `suppliers`, and `vehicles` in migration `2026_10_30_000018_stage6_enterprise_scale_and_partial_grn.php`.
+    - Added `SoftDeletes` trait to `Product`, `Customer`, `Supplier`, and `Vehicle` models.
+    - Hardened parent delete guards in `CategoryController` and `UnitOfMeasureController` with `withTrashed()` to prevent SQL foreign key errors on soft-deleted children.
+    - Implemented `restore(int $id)` methods and `trashed=true` listing filters on `ProductController`, `CustomerController`, `SupplierController`, and `VehicleController`.
+    - Registered restore routes: `POST /products/{id}/restore`, `POST /customers/{id}/restore`, `POST /suppliers/{id}/restore`, `POST /vehicles/{id}/restore`.
+  - **Automated Pest Feature Test Suite:**
+    - Authored `tests/Feature/Phase10EnterpriseScaleAndPartialGrnTest.php` with 5 comprehensive feature tests.
+    - Repository Test Suite: **170 passed (1001 assertions) — 100% pass rate in 18.37s**.
 - **Stage 5: CRUD Matrix Completion & Variant Alignment (Forensic Remediation):**
   - **Attributes & AttributeValues Full CRUD:**
     - `AttributeController`: Added `update` (`PUT /attributes/{id}`) and `destroy` (`DELETE /attributes/{id}`) with relational guards blocking deletion when values are actively mapped to product variants (`422 Unprocessable Entity`).

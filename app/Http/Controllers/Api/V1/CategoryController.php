@@ -82,10 +82,10 @@ class CategoryController extends Controller
     {
         $category = Category::findOrFail($id);
 
-        if ($category->products()->exists()) {
+        if ($category->products()->withTrashed()->exists()) {
             return response()->json([
                 'success' => false,
-                'message' => "Cannot delete category '{$category->name}'. There are active products linked to this category.",
+                'message' => "Cannot delete category '{$category->name}'. There are active or archived products linked to this category.",
             ], 422);
         }
 

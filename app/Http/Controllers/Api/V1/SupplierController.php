@@ -33,6 +33,12 @@ class SupplierController extends Controller
             $query->where('outstanding_balance', '>', 0);
         }
 
+        if ($request->boolean('trashed')) {
+            $query->onlyTrashed();
+        } elseif ($request->boolean('with_trashed')) {
+            $query->withTrashed();
+        }
+
         $suppliers = $query->orderBy('name')->paginate(20);
 
         return SupplierResource::collection($suppliers);
@@ -127,6 +133,21 @@ class SupplierController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Supplier deleted successfully.',
+        ]);
+    }
+
+    /**
+     * Restore a soft-deleted supplier (Enterprise Asset Recovery).
+     */
+    public function restore(int $id): JsonResponse
+    {
+        $supplier = Supplier::onlyTrashed()->findOrFail($id);
+        $supplier->restore();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Supplier '{$supplier->name}' restored successfully.",
+            'data' => new SupplierResource($supplier),
         ]);
     }
 }
