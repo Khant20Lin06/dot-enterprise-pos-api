@@ -16,14 +16,15 @@ class SettleCustomerCreditAction
         float $amount,
         string $paymentMethod = 'Cash',
         ?string $note = null,
-        ?int $cashierId = null
+        ?int $cashierId = null,
+        ?int $posSessionId = null
     ): CreditSettlement {
         // VULN-06 Hardening: Invariant assertion (Prevent negative debt inflation)
         if ($amount <= 0) {
             throw new \InvalidArgumentException("Settlement payment amount must be strictly greater than zero.");
         }
 
-        return DB::transaction(function () use ($customerId, $amount, $paymentMethod, $note, $cashierId) {
+        return DB::transaction(function () use ($customerId, $amount, $paymentMethod, $note, $cashierId, $posSessionId) {
             // 1. Lock customer row to prevent concurrent balance race condition
             $customer = Customer::where('id', $customerId)->lockForUpdate()->firstOrFail();
 
@@ -36,6 +37,9 @@ class SettleCustomerCreditAction
             // 4. Generate Atomic Sequential Receipt Number (Concurrency-Safe)
             $receiptNo = app(\App\Services\AtomicSequenceService::class)->getNextSequence('REC');
 
+            // Resolve active cashier shift session if not explicitly provided
+            $resolvedSessionId = $posSessionId ?? ($cashierId ? \App\Domains\SalesAndPos\Models\PosSession::where('cashier_id', $cashierId)->where('status', 'open')->first()?->id : null);
+
             // 5. Create Settlement Record
             return CreditSettlement::create([
                 'receipt_no' => $receiptNo,
@@ -44,6 +48,7 @@ class SettleCustomerCreditAction
                 'payment_method' => $paymentMethod,
                 'note' => $note,
                 'cashier_id' => $cashierId ?? 1,
+                'pos_session_id' => $resolvedSessionId,
             ]);
         });
     }

@@ -64,13 +64,15 @@ class CustomerCreditController extends Controller
     public function settleCredit(int $id, SettleCreditRequest $request, SettleCustomerCreditAction $action): JsonResponse
     {
         $cashierId = $request->cashier_id ?? ($request->user()?->id ?? 1);
+        $posSessionId = $request->pos_session_id ?? null;
 
         $settlement = $action->execute(
             customerId: $id,
             amount: (float) $request->amount,
-            paymentMethod: $request->payment_method,
+            paymentMethod: $request->payment_method ?? 'Cash',
+            note: $request->note,
             cashierId: $cashierId,
-            note: $request->note
+            posSessionId: $posSessionId
         );
 
         $customer = Customer::findOrFail($id);

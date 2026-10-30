@@ -31,4 +31,8 @@ return [
         ],
     ],
 
+    'payment_gateway' => [
+        'webhook_secret' => env('PAYMENT_GATEWAY_WEBHOOK_SECRET', 'dot_enterprise_webhook_secret_key_2026'),
+    ],
+
 ];

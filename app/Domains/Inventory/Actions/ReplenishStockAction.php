@@ -4,14 +4,22 @@ namespace App\Domains\Inventory\Actions;
 
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\ProductOption;
+use App\Domains\Inventory\Models\ProductVariant;
+use App\Domains\Inventory\Models\WarehouseStock;
 
 class ReplenishStockAction
 {
     /**
      * Increase inventory upon purchasing or return restocking.
+     * Enforces consistent row locking across Product master, Variant, Option, and WarehouseStock.
      */
-    public function execute(int $productId, int $qty, ?int $productOptionId = null, ?int $warehouseId = null): Product
-    {
+    public function execute(
+        int $productId,
+        int $qty,
+        ?int $productOptionId = null,
+        ?int $warehouseId = null,
+        ?int $productVariantId = null
+    ): Product {
         $product = Product::where('id', $productId)->lockForUpdate()->firstOrFail();
 
         if ($product->is_labor) {
@@ -21,6 +29,7 @@ class ReplenishStockAction
         $product->increment('stock', $qty);
         $freshProduct = $product->fresh();
 
+        // 1. If legacy option provided, lock and increment
         if ($productOptionId) {
             $option = ProductOption::where('id', $productOptionId)
                 ->where('product_id', $productId)
@@ -32,9 +41,21 @@ class ReplenishStockAction
             }
         }
 
-        // If specific warehouse provided, increment warehouse stock
+        // 2. If multi-attribute product variant provided, lock and increment
+        if ($productVariantId) {
+            $variant = ProductVariant::where('id', $productVariantId)
+                ->where('product_id', $productId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($variant) {
+                $variant->increment('stock', $qty);
+            }
+        }
+
+        // 3. If specific warehouse provided, increment warehouse stock
         if ($warehouseId) {
-            $whStock = \App\Domains\Inventory\Models\WarehouseStock::firstOrCreate(
+            $whStock = WarehouseStock::firstOrCreate(
                 [
                     'warehouse_id' => $warehouseId,
                     'product_id' => $productId,
@@ -43,7 +64,7 @@ class ReplenishStockAction
                 ['stock_qty' => 0]
             );
 
-            \App\Domains\Inventory\Models\WarehouseStock::where('id', $whStock->id)
+            WarehouseStock::where('id', $whStock->id)
                 ->lockForUpdate()
                 ->increment('stock_qty', $qty);
         }

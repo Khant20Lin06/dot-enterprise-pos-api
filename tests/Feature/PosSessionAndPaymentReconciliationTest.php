@@ -318,12 +318,18 @@ it('processes simulated gateway webhook callback and marks transaction successfu
         'order_no' => 'INV-HOOK-001',
     ]);
 
-    $webhookResponse = $this->postJson('/api/v1/payments/simulate-webhook', [
+    $payload = [
         'provider' => 'kbzpay',
         'gateway_ref' => $transaction->gateway_ref,
         'status' => 'successful',
         'amount' => 30000.00,
         'transaction_id' => 'KBZ-TXN-CONFIRMED-999',
+    ];
+    $secret = config('services.payment_gateway.webhook_secret', 'dot_enterprise_webhook_secret_key_2026');
+    $signature = hash_hmac('sha256', json_encode($payload), $secret);
+
+    $webhookResponse = $this->postJson('/api/v1/payments/simulate-webhook', $payload, [
+        'X-Signature' => $signature,
     ]);
 
     $webhookResponse->assertStatus(200)

@@ -59,8 +59,16 @@ class ClosePosSessionAction
             $totalRefunds = (float) $returns->sum('total_refund_amount');
             $cashRefunds = (float) $returns->filter(fn ($r) => strtolower($r->refund_method) === 'cash')->sum('total_refund_amount');
 
-            // 4. Mathematical Drawer Formula: Expected Cash = Opening Float + Cash Sales - Cash Refunds
-            $expectedCash = round((float) $session->opening_float + $cashSales - $cashRefunds, 2);
+            // 3b. Reconcile Customer Credit Debt Settlements collected during this shift session
+            $creditSettlements = \App\Domains\CreditAndLedger\Models\CreditSettlement::where('pos_session_id', $session->id)->get();
+            $creditSettlementCash = (float) $creditSettlements->filter(fn ($cs) => strtolower($cs->payment_method) === 'cash')->sum('amount');
+
+            // Account for change given on cash sales (overpayment)
+            $totalChangeGiven = (float) $orders->sum('change_amount');
+            $netCashSales = max(0.00, $cashSales - $totalChangeGiven);
+
+            // 4. Mathematical Drawer Formula: Expected Cash = Opening Float + Net Cash Sales + Credit Collections - Cash Refunds
+            $expectedCash = round((float) $session->opening_float + $netCashSales + $creditSettlementCash - $cashRefunds, 2);
             $cashVariance = round($countedCash - $expectedCash, 2);
 
             // 5. Update and Close Session

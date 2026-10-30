@@ -721,8 +721,11 @@
 * **Endpoint:** `GET /payments/transactions/{transactionNo}`
 * **Response (200 OK):** Transaction status (`pending`, `successful`, `failed`).
 
-### 11.3. Simulate / Receive Payment Webhook Callback
-* **Endpoint:** `POST /payments/simulate-webhook`
+### 11.3. Receive Payment Webhook Callback (Public Boundary)
+* **Endpoint:** `POST /payments/webhook` (or alias `POST /payments/simulate-webhook`)
+* **Authentication:** Public (No Sanctum Token required). Protected by HMAC-SHA256 signature verification.
+* **Headers:**
+  - `X-Signature`: Hex-encoded HMAC-SHA256 of the raw JSON request payload using `PAYMENT_GATEWAY_WEBHOOK_SECRET`.
 * **Request Body:**
 ```json
 {
@@ -734,3 +737,4 @@
 }
 ```
 * **Response (200 OK):** Transitions transaction to `successful` and confirms associated order payment split.
+* **Error Response (403 Forbidden):** Returns `403` if `X-Signature` header is missing or does not match calculated HMAC.

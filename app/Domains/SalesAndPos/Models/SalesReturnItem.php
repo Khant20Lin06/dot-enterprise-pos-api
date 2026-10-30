@@ -14,6 +14,7 @@ class SalesReturnItem extends Model
         'sales_order_item_id',
         'product_id',
         'product_option_id',
+        'product_variant_id',
         'qty',
         'unit_price',
         'refund_subtotal',
@@ -46,5 +47,10 @@ class SalesReturnItem extends Model
     public function productOption(): BelongsTo
     {
         return $this->belongsTo(ProductOption::class, 'product_option_id');
+    }
+
+    public function productVariant(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Inventory\Models\ProductVariant::class, 'product_variant_id');
     }
 }

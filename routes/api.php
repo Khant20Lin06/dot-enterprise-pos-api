@@ -33,6 +33,12 @@ Route::prefix('v1')->group(function () {
         Route::post('/verify-pin', [AuthController::class, 'verifyPin'])->middleware('throttle:10,1');
     });
 
+    // Public Payment Gateway Webhooks (Hardened: Protected with HMAC-SHA256 Signature Verification)
+    Route::prefix('payments')->middleware('verify.payment.signature')->group(function () {
+        Route::post('/webhook', [PaymentGatewayController::class, 'handleWebhook']);
+        Route::post('/simulate-webhook', [PaymentGatewayController::class, 'simulateWebhook']);
+    });
+
     // Protected Endpoints (Requires Sanctum Bearer Token)
     Route::middleware('auth:sanctum')->group(function () {
         // Authenticated Staff
@@ -60,50 +66,70 @@ Route::prefix('v1')->group(function () {
             Route::get('/{id}', [AttributeController::class, 'show']);
         });
 
-        // POS Operations & Orders
+        // POS Operations & Orders (Hardened with RBAC Permissions)
         Route::prefix('pos')->group(function () {
-            Route::post('/checkout', [PosController::class, 'checkout']);
-            Route::get('/orders', [PosController::class, 'orders']);
-            Route::get('/orders/{id}', [PosController::class, 'showOrder']);
-            Route::post('/orders/{id}/reprint', [PosController::class, 'reprintReceipt']);
+            Route::post('/checkout', [PosController::class, 'checkout'])
+                ->middleware('permission:pos,create');
+            Route::get('/orders', [PosController::class, 'orders'])
+                ->middleware('permission:pos,view');
+            Route::get('/orders/{id}', [PosController::class, 'showOrder'])
+                ->middleware('permission:pos,view');
+            Route::post('/orders/{id}/reprint', [PosController::class, 'reprintReceipt'])
+                ->middleware('permission:pos,create');
 
             // Parked Carts (Held Orders)
-            Route::get('/held-orders', [PosController::class, 'listHeldOrders']);
-            Route::post('/held-orders', [PosController::class, 'parkOrder']);
-            Route::delete('/held-orders/{id}', [PosController::class, 'deleteHeldOrder']);
+            Route::get('/held-orders', [PosController::class, 'listHeldOrders'])
+                ->middleware('permission:pos,view');
+            Route::post('/held-orders', [PosController::class, 'parkOrder'])
+                ->middleware('permission:pos,create');
+            Route::delete('/held-orders/{id}', [PosController::class, 'deleteHeldOrder'])
+                ->middleware('permission:pos,create');
 
             // Cash Register Shifts (Sessions) & Blind Count Reconciliation
             Route::prefix('sessions')->group(function () {
-                Route::get('/', [PosSessionController::class, 'index']);
-                Route::get('/current', [PosSessionController::class, 'current']);
-                Route::post('/open', [PosSessionController::class, 'open']);
-                Route::get('/{id}', [PosSessionController::class, 'show']);
-                Route::post('/{id}/close', [PosSessionController::class, 'close']);
-                Route::get('/{id}/x-report', [PosSessionController::class, 'xReport']);
-                Route::get('/{id}/z-report', [PosSessionController::class, 'zReport']);
+                Route::get('/', [PosSessionController::class, 'index'])
+                    ->middleware('permission:pos,view');
+                Route::get('/current', [PosSessionController::class, 'current'])
+                    ->middleware('permission:pos,view');
+                Route::post('/open', [PosSessionController::class, 'open'])
+                    ->middleware('permission:pos,create');
+                Route::get('/{id}', [PosSessionController::class, 'show'])
+                    ->middleware('permission:pos,view');
+                Route::post('/{id}/close', [PosSessionController::class, 'close'])
+                    ->middleware('permission:pos,create');
+                Route::get('/{id}/x-report', [PosSessionController::class, 'xReport'])
+                    ->middleware('permission:pos,view');
+                Route::get('/{id}/z-report', [PosSessionController::class, 'zReport'])
+                    ->middleware('permission:pos,view');
             });
         });
 
-        // Payment Gateways & Dynamic QR
+        // Payment Gateways & Dynamic QR (Protected customer-facing endpoints)
         Route::prefix('payments')->group(function () {
-            Route::post('/generate-qr', [PaymentGatewayController::class, 'generateQr']);
-            Route::get('/transactions/{transactionNo}', [PaymentGatewayController::class, 'status']);
-            Route::post('/simulate-webhook', [PaymentGatewayController::class, 'simulateWebhook']);
+            Route::post('/generate-qr', [PaymentGatewayController::class, 'generateQr'])
+                ->middleware('permission:pos,create');
+            Route::get('/transactions/{transactionNo}', [PaymentGatewayController::class, 'status'])
+                ->middleware('permission:pos,view');
         });
 
         // Sales Returns & Refunds
         Route::prefix('sales-returns')->group(function () {
-            Route::get('/', [SalesReturnController::class, 'index']);
+            Route::get('/', [SalesReturnController::class, 'index'])
+                ->middleware('permission:pos,view');
             Route::post('/', [SalesReturnController::class, 'store'])
                 ->middleware('permission:pos,create');
-            Route::get('/{id}', [SalesReturnController::class, 'show']);
+            Route::get('/{id}', [SalesReturnController::class, 'show'])
+                ->middleware('permission:pos,view');
         });
 
         // Automotive Workshop & Job Cards
         Route::prefix('workshop')->group(function () {
-            Route::get('/work-orders', [WorkOrderController::class, 'index']);
-            Route::post('/work-orders', [WorkOrderController::class, 'store']);
-            Route::get('/work-orders/{id}', [WorkOrderController::class, 'show']);
+            Route::get('/work-orders', [WorkOrderController::class, 'index'])
+                ->middleware('permission:workshop,view');
+            Route::post('/work-orders', [WorkOrderController::class, 'store'])
+                ->middleware('permission:workshop,create');
+            Route::get('/work-orders/{id}', [WorkOrderController::class, 'show'])
+                ->middleware('permission:workshop,view');
             Route::post('/work-orders/{id}/convert-to-invoice', [WorkOrderController::class, 'convertToInvoice'])
                 ->middleware('permission:workshop,approveJobCard');
         });
@@ -138,10 +164,12 @@ Route::prefix('v1')->group(function () {
 
         // Staff Users Management (Restricted to settings.manageRoles)
         Route::prefix('staff')->group(function () {
-            Route::get('/', [StaffUserController::class, 'index']);
+            Route::get('/', [StaffUserController::class, 'index'])
+                ->middleware('permission:settings,manageRoles');
             Route::post('/', [StaffUserController::class, 'store'])
                 ->middleware('permission:settings,manageRoles');
-            Route::get('/{id}', [StaffUserController::class, 'show']);
+            Route::get('/{id}', [StaffUserController::class, 'show'])
+                ->middleware('permission:settings,manageRoles');
             Route::put('/{id}', [StaffUserController::class, 'update'])
                 ->middleware('permission:settings,manageRoles');
             Route::patch('/{id}/status', [StaffUserController::class, 'updateStatus'])

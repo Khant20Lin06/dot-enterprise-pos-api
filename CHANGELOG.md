@@ -8,6 +8,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Phase F Implementation: Enterprise Red-Team Hardening & Vulnerability Remediation:**
+  - **Database Migration (`2026_10_30_000013_security_and_enterprise_hardening.php`):**
+    - Added `pos_session_id` foreign key to `credit_settlements` table.
+    - Added `product_variant_id` foreign key to `sales_return_items` table.
+    - Added `change_amount` decimal(14,2) column to `sales_orders` table.
+  - **Security & Webhook Middleware (`VerifyPaymentGatewaySignature`):**
+    - Verifies incoming payment webhooks via HMAC-SHA256 signature using `config('services.payment_gateway.webhook_secret')`.
+    - Logs critical audit trail entries for missing or forged signatures.
+    - Moved payment webhooks (`POST /api/v1/payments/webhook`) outside `auth:sanctum` to public boundary.
+  - **Cash Drawer Accounting Invariant Harmonization:**
+    - `ConvertWorkOrderToInvoiceAction`: Automatically links workshop job card sales orders to the cashier's active shift session (`pos_session_id`).
+    - `SettleCustomerCreditAction`: Automatically links debt collection receipts to active shift session.
+    - `ClosePosSessionAction`: Unified cash drawer formula: `expected_cash = opening_float + net_cash_sales + credit_settlement_cash - cash_refunds`.
+    - `GenerateShiftAuditReportAction`: Added credit debt collections and change given breakdown to X/Z-Reports.
+  - **Multi-Warehouse & Product Variant Inventory Restocking:**
+    - `ReplenishStockAction`: Restocks specific `ProductVariant` inventory and target `WarehouseStock` concurrently with pessimistic row locking.
+    - `ProcessSaleReturnAction`: Passes cashier warehouse location and variant ID when processing sellable returns.
+  - **Deterministic Global Lock Hierarchy (Deadlock Prevention):**
+    - Standardized lock order in `DispatchStockTransferAction`, `ReceiveStockTransferAction`, and `CancelStockTransferAction`: locks `Product` master before `WarehouseStock` in deterministic ascending `product_id` order to prevent deadlocks with POS Checkouts.
+  - **Anti-Arbitrage Loyalty Protection:**
+    - `ProcessSaleReturnAction`: Claws back cash value of missing loyalty points from the customer refund amount when points were depleted at another counter.
+  - **Session Concurrency & Security Hardening:**
+    - `OpenPosSessionAction`: Guarded against rapid double-click race conditions via atomic cache lock.
+    - `AuthController`: Prunes stale `pin-session` tokens upon each PIN verification to prevent token accumulation.
+    - `ReceiveStockTransferAction`: Reconciles lost/damaged goods during transit as Damage/Scrap inventory write-offs.
+    - `bootstrap/app.php`: Configured trusted proxies and forwarded headers against IP spoofing.
+  - **Feature Test Suite (`tests/Feature/SecurityHardeningAuditTest.php`):**
+    - 12 new comprehensive security and business logic tests covering all red-team attack vectors (100% pass rate).
+
+### Changed
 - **Phase E Implementation: Payment Gateways, Cashier Shifts & Cash Reconciliation:**
   - **Database Migration (`2026_10_30_000012_create_pos_sessions_and_payment_gateways_tables.php`):**
     - `pos_sessions`: Cash register shift sessions tracking cashier, physical terminal, opening float, timestamps, counted cash, calculated expected cash, variance, and breakdown by payment tender.

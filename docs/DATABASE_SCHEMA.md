@@ -353,6 +353,7 @@ erDiagram
   * `tax_amount` (DECIMAL(14,2), DEFAULT 0.00)
   * `total_amount` (DECIMAL(14,2))
   * `paid_amount` (DECIMAL(14,2))
+  * `change_amount` (DECIMAL(14,2), DEFAULT 0.00) — Overpayment change returned
   * `due_amount` (DECIMAL(14,2), DEFAULT 0.00) — If sold on credit
   * `points_earned` (INT, DEFAULT 0)
   * `points_redeemed` (INT, DEFAULT 0)
@@ -408,6 +409,7 @@ erDiagram
   * `payment_method` (VARCHAR(50))
   * `note` (TEXT, NULLABLE)
   * `cashier_id` (BIGINT, FK -> `staff_users.id`)
+  * `pos_session_id` (BIGINT, NULLABLE, FK -> `pos_sessions.id`, ON DELETE SET NULL)
   * `created_at` (TIMESTAMP)
 
 * **`sales_returns`** (Sales Returns & Refunds Master)
@@ -431,6 +433,7 @@ erDiagram
   * `sales_order_item_id` (BIGINT, FK -> `sales_order_items.id`, ON DELETE RESTRICT)
   * `product_id` (BIGINT, FK -> `products.id`, ON DELETE RESTRICT)
   * `product_option_id` (BIGINT, NULLABLE, FK -> `product_options.id`, ON DELETE SET NULL)
+  * `product_variant_id` (BIGINT, NULLABLE, FK -> `product_variants.id`, ON DELETE SET NULL)
   * `qty` (INT)
   * `unit_price` (DECIMAL(14,2))
   * `refund_subtotal` (DECIMAL(14,2))

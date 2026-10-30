@@ -69,11 +69,15 @@ class ConvertWorkOrderToInvoiceAction
             // 5. Generate Sales Order with Atomic Concurrency-Safe Sequencing
             $orderNo = app(\App\Services\AtomicSequenceService::class)->getNextSequence('INV');
 
+            // Resolve active shift session for cashier if open
+            $activeSession = \App\Domains\SalesAndPos\Models\PosSession::where('cashier_id', $cashierId)->where('status', 'open')->first();
+
             $salesOrder = SalesOrder::create([
                 'order_no' => $orderNo,
                 'customer_id' => $workOrder->customer_id,
                 'vehicle_id' => $workOrder->vehicle_id,
                 'cashier_id' => $cashierId,
+                'pos_session_id' => $activeSession?->id,
                 'subtotal' => $workOrder->parts_total,
                 'labor_total' => $workOrder->labor_fee,
                 'discount_amount' => 0.00,

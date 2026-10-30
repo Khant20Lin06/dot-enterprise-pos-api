@@ -2,6 +2,7 @@
 
 namespace App\Domains\Inventory\Actions;
 
+use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\StockTransfer;
 use App\Domains\Inventory\Models\WarehouseStock;
 use App\Domains\SecurityAndAudit\Models\AuditLog;
@@ -12,6 +13,7 @@ class CancelStockTransferAction
 {
     /**
      * Cancel a draft or in-transit transfer, reverting dispatched goods if necessary.
+     * Enforces consistent global ascending lock order.
      *
      * @throws DomainException
      */
@@ -28,10 +30,15 @@ class CancelStockTransferAction
                 return $locked;
             }
 
-            // If in-transit, revert inventory back to source warehouse
+            // If in-transit, revert inventory back to source warehouse in ascending product order
             if ($locked->status === 'In Transit') {
-                foreach ($locked->items as $item) {
+                $sortedItems = $locked->items->sortBy('product_id');
+
+                foreach ($sortedItems as $item) {
                     if ($item->qty_dispatched > 0) {
+                        // Global lock order: Lock Product master first
+                        Product::where('id', $item->product_id)->lockForUpdate()->first();
+
                         WarehouseStock::where('warehouse_id', $locked->source_warehouse_id)
                             ->where('product_id', $item->product_id)
                             ->when($item->product_option_id, fn ($q) => $q->where('product_option_id', $item->product_option_id))
@@ -58,7 +65,7 @@ class CancelStockTransferAction
                 'created_at' => now(),
             ]);
 
-            return $locked->fresh(['sourceWarehouse', 'destinationWarehouse', 'items.product']);
+            return $locked->fresh(['items', 'sourceWarehouse', 'destinationWarehouse']);
         });
     }
 }

@@ -3,6 +3,8 @@
 namespace App\Domains\Inventory\Actions;
 
 use App\Domains\Inventory\Events\StockTransferReceivedEvent;
+use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\StockAdjustment;
 use App\Domains\Inventory\Models\StockTransfer;
 use App\Domains\Inventory\Models\WarehouseStock;
 use App\Domains\SecurityAndAudit\Models\AuditLog;
@@ -13,6 +15,7 @@ class ReceiveStockTransferAction
 {
     /**
      * Receive in-transit stock transfer at destination warehouse, incrementing physical location inventory.
+     * Enforces global ascending lock order and accounts for damaged/lost-in-transit items (MED-03).
      *
      * @param  array<int, int>|null  $receivedQuantities  [item_id => qty_received]
      * @throws DomainException
@@ -28,8 +31,14 @@ class ReceiveStockTransferAction
 
             $dest = $lockedTransfer->destinationWarehouse;
 
+            // Sort transfer items deterministically by product_id ascending
+            $sortedItems = $lockedTransfer->items->sortBy('product_id');
+
             // 1. Lock and increment each item in destination warehouse stock
-            foreach ($lockedTransfer->items as $item) {
+            foreach ($sortedItems as $item) {
+                // Global lock order: Lock Product master row first
+                $product = Product::where('id', $item->product_id)->lockForUpdate()->firstOrFail();
+
                 $qtyToReceive = isset($receivedQuantities[$item->id])
                     ? (int) $receivedQuantities[$item->id]
                     : $item->qty_dispatched;
@@ -52,6 +61,22 @@ class ReceiveStockTransferAction
                     ->increment('stock_qty', $qtyToReceive);
 
                 $item->update(['qty_received' => $qtyToReceive]);
+
+                // MED-03 Hardening: Track lost-in-transit goods and deduct from master company assets
+                $lostQty = $item->qty_dispatched - $qtyToReceive;
+                if ($lostQty > 0) {
+                    StockAdjustment::create([
+                        'product_id' => $item->product_id,
+                        'type' => 'Damage / Scrap',
+                        'prev_stock' => $product->stock,
+                        'adjusted_qty' => -$lostQty,
+                        'new_stock' => $product->stock - $lostQty,
+                        'reason' => "Transfer #{$lockedTransfer->transfer_no} lost in transit (Dispatched: {$item->qty_dispatched}, Received: {$qtyToReceive})",
+                        'staff_id' => $receivedBy,
+                    ]);
+
+                    $product->decrement('stock', $lostQty);
+                }
             }
 
             // 2. Transition status to Received
@@ -68,19 +93,18 @@ class ReceiveStockTransferAction
                 'severity' => 'info',
                 'resource_type' => 'stock_transfers',
                 'resource_id' => (string) $lockedTransfer->id,
-                'description' => "Transfer {$lockedTransfer->transfer_no} received at '{$dest->name}'. Inventory restocked.",
+                'description' => "Stock transfer #{$lockedTransfer->transfer_no} received at {$dest->name}",
                 'diffs' => [
                     'transfer_no' => $lockedTransfer->transfer_no,
-                    'destination' => $dest->name,
                     'status' => 'Received',
-                    'received_at' => now()->toIso8601String(),
+                    'received_items' => $lockedTransfer->items->count(),
                 ],
                 'created_at' => now(),
             ]);
 
             event(new StockTransferReceivedEvent($lockedTransfer));
 
-            return $lockedTransfer->fresh(['sourceWarehouse', 'destinationWarehouse', 'items.product', 'requester', 'approver', 'receiver']);
+            return $lockedTransfer->fresh(['items.product', 'sourceWarehouse', 'destinationWarehouse', 'receiver']);
         });
     }
 }

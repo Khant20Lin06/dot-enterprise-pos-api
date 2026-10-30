@@ -15,11 +15,17 @@ class CreditSettlement extends Model
         'payment_method',
         'note',
         'cashier_id',
+        'pos_session_id',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
     ];
+
+    public function posSession(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\SalesAndPos\Models\PosSession::class, 'pos_session_id');
+    }
 
     public function customer(): BelongsTo
     {

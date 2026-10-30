@@ -40,7 +40,14 @@ class GenerateShiftAuditReportAction
         $totalRefunds = (float) $returns->sum('total_refund_amount');
         $cashRefunds = (float) $returns->filter(fn ($r) => strtolower($r->refund_method) === 'cash')->sum('total_refund_amount');
 
-        $expectedCash = round((float) $session->opening_float + $cashSales - $cashRefunds, 2);
+        // Reconcile Customer Credit Settlements collected during shift
+        $creditSettlements = \App\Domains\CreditAndLedger\Models\CreditSettlement::where('pos_session_id', $session->id)->get();
+        $creditSettlementCash = (float) $creditSettlements->filter(fn ($cs) => strtolower($cs->payment_method) === 'cash')->sum('amount');
+
+        $totalChangeGiven = (float) $orders->sum('change_amount');
+        $netCashSales = max(0.00, $cashSales - $totalChangeGiven);
+
+        $expectedCash = round((float) $session->opening_float + $netCashSales + $creditSettlementCash - $cashRefunds, 2);
         $countedCash = $isClosed ? (float) $session->counted_cash : null;
         $variance = $isClosed ? (float) $session->cash_variance : null;
 
@@ -89,7 +96,9 @@ class GenerateShiftAuditReportAction
             ],
             'cashReconciliation' => [
                 'openingFloat' => (float) $session->opening_float,
-                'netCashTender' => round($cashSales - $cashRefunds, 2),
+                'netCashTender' => round($netCashSales - $cashRefunds, 2),
+                'creditCollections' => $creditSettlementCash,
+                'changeGiven' => $totalChangeGiven,
                 'expectedDrawerCash' => $expectedCash,
                 'countedCash' => $countedCash,
                 'cashVariance' => $variance,

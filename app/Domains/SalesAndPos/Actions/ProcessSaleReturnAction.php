@@ -111,6 +111,7 @@ class ProcessSaleReturnAction
                     'sales_order_item_id' => $orderItem->id,
                     'product_id' => $orderItem->product_id,
                     'product_option_id' => $orderItem->product_option_id,
+                    'product_variant_id' => $orderItem->product_variant_id,
                     'qty' => $qty,
                     'unit_price' => $effectiveUnitPrice,
                     'refund_subtotal' => $lineRefund,
@@ -119,16 +120,22 @@ class ProcessSaleReturnAction
                 ];
             }
 
+            // Resolve target warehouse for physical restocking
+            $activeSession = \App\Domains\SalesAndPos\Models\PosSession::where('cashier_id', $cashierId)->where('status', 'open')->first();
+            $targetWarehouseId = $data['warehouse_id'] ?? $activeSession?->warehouse_id ?? null;
+
             // 4. Physical Inventory Restocking / Quarantine
             foreach ($returnItemsPayload as $rItem) {
                 $product = Product::where('id', $rItem['product_id'])->lockForUpdate()->firstOrFail();
 
                 if ($rItem['restocked']) {
-                    // Restock sellable inventory
+                    // Restock sellable inventory across Product Master, Variant, and Warehouse Location
                     $this->replenishStockAction->execute(
-                        $rItem['product_id'],
-                        $rItem['qty'],
-                        $rItem['product_option_id']
+                        productId: $rItem['product_id'],
+                        qty: $rItem['qty'],
+                        productOptionId: $rItem['product_option_id'],
+                        warehouseId: $targetWarehouseId,
+                        productVariantId: $rItem['product_variant_id']
                     );
                 } else {
                     // Quarantine damaged/scrap goods: create a stock adjustment record
@@ -144,15 +151,30 @@ class ProcessSaleReturnAction
                 }
             }
 
-            // 5. Proportional Loyalty Points Reversal
+            // 5. Proportional Loyalty Points Reversal & Arbitrage Floor Protection (HIGH-02)
             $pointsToDeduct = 0;
             if ($customer && $salesOrder->points_earned > 0 && $salesOrder->total_amount > 0) {
                 $ratio = min(1.0, $totalRefundAmount / (float) $salesOrder->total_amount);
-                $pointsToDeduct = (int) round($salesOrder->points_earned * $ratio);
-                $pointsToDeduct = min($pointsToDeduct, $customer->loyalty_points); // Floor guard
+                $theoreticalPointsToDeduct = (int) round($salesOrder->points_earned * $ratio);
 
-                if ($pointsToDeduct > 0) {
-                    $customer->decrement('loyalty_points', $pointsToDeduct);
+                if ($customer->loyalty_points < $theoreticalPointsToDeduct) {
+                    // Exploit mitigation: Customer consumed points. Claw back equivalent cash from refund.
+                    $pointsDeficit = $theoreticalPointsToDeduct - $customer->loyalty_points;
+                    $pointsToDeduct = $customer->loyalty_points;
+
+                    if ($customer->loyalty_points > 0) {
+                        $customer->decrement('loyalty_points', $customer->loyalty_points);
+                    }
+
+                    // 1 point per 1,000 Ks
+                    $pointValue = 1000.00;
+                    $cashDeduction = round($pointsDeficit * $pointValue, 2);
+                    $totalRefundAmount = max(0.00, round($totalRefundAmount - $cashDeduction, 2));
+                } else {
+                    $pointsToDeduct = $theoreticalPointsToDeduct;
+                    if ($pointsToDeduct > 0) {
+                        $customer->decrement('loyalty_points', $pointsToDeduct);
+                    }
                 }
             }
 

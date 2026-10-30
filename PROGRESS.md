@@ -26,6 +26,7 @@
 | **Phase C** | Multi-Warehouse & Multi-Branch Engine (Warehouses, Two-Step Transfers, Location Stocks) | 🟢 Completed | 100% |
 | **Phase D** | Product Variants: Size & Color EAV Matrix (Attributes Master, Cartesian Matrix, Barcode Resolution) | 🟢 Completed | 100% |
 | **Phase E** | Payment Gateways, Cashier Shifts & Reconciliation (Shift Open/Close, Blind Count, MMQR, X/Z-Reports) | 🟢 Completed | 100% |
+| **Phase F** | Enterprise Red-Team Hardening & Vulnerability Remediation (CRIT-01 to CRIT-04, HIGH-01 to HIGH-04, MED-01 to MED-03) | 🟢 Completed | 100% |
 
 ---
 
@@ -190,3 +191,41 @@
 - [x] Pest Feature Test Suite:
   - `tests/Feature/PosSessionAndPaymentReconciliationTest.php`: 9 passed (50 assertions).
   - Full Test Suite: **81 passed (414 assertions) — 100% pass rate in 4.20s**.
+
+---
+
+### Phase F: Enterprise Red-Team Hardening & Vulnerability Remediation
+- [x] Schema Migration: `2026_10_30_000013_security_and_enterprise_hardening.php`
+  - Added `pos_session_id` nullable FK to `credit_settlements` table.
+  - Added `product_variant_id` nullable FK to `sales_return_items` table.
+  - Added `change_amount` decimal(14,2) to `sales_orders` table.
+- [x] **CRIT-01: Cryptographic Webhook Security & Auth Boundary**
+  - Moved `POST /api/v1/payments/webhook` outside `auth:sanctum` to a public boundary.
+  - Created `VerifyPaymentGatewaySignature` middleware validating `X-Signature` via HMAC-SHA256 (`PAYMENT_GATEWAY_WEBHOOK_SECRET`).
+  - Added immutable audit trail for verified and forged webhook callbacks.
+- [x] **CRIT-02: Workshop & Credit Settlement Shift Drawer Reconciliation**
+  - `ConvertWorkOrderToInvoiceAction`: Automatically links generated sales order to active cashier register shift (`pos_session_id`).
+  - `SettleCustomerCreditAction`: Associates credit settlement receipts with active cashier shift.
+  - `ClosePosSessionAction`: Unified cash drawer formula: `expected_cash = opening_float + net_cash_sales + credit_settlement_cash - cash_refunds`.
+  - `GenerateShiftAuditReportAction`: Real-time X/Z-Reports reflect credit settlement collections and cash change breakdown.
+- [x] **CRIT-03: Multi-Warehouse & Product Variant Sales Return Restock**
+  - `ReplenishStockAction`: Enhanced with `?int $productVariantId = null` to increment both `ProductVariant::stock` and `WarehouseStock::stock_qty`.
+  - `ProcessSaleReturnAction`: Captures `product_variant_id` and targets cashier's active warehouse location for sellable returns.
+- [x] **CRIT-04: Deterministic Global Lock Hierarchy (Deadlock Prevention)**
+  - `DispatchStockTransferAction`: Standardized ascending `product_id` lock acquisition ordering: locks `Product` master before `WarehouseStock`.
+  - `ReceiveStockTransferAction` & `CancelStockTransferAction`: Symmetrical ascending lock order to eliminate circular lock waits with POS Checkouts.
+- [x] **HIGH-01: Shift Opening Race Condition Protection**
+  - `OpenPosSessionAction`: Protected via atomic cache lock (`pos_session_open_cashier_{id}`) before transaction execution.
+- [x] **HIGH-02: Loyalty Points Arbitrage Protection**
+  - `ProcessSaleReturnAction`: Mitigates points depletion exploit by clawing back equivalent cash from refund amount when customer loyalty balance is insufficient.
+- [x] **HIGH-03: Strict RBAC Route Middleware**
+  - Enforced `permission:pos,create` on checkout and shift actions; `permission:pos,view` on orders and sessions; `permission:settings,manageRoles` on staff management endpoints.
+- [x] **HIGH-04: Trusted Proxies Configuration**
+  - Configured `$middleware->trustProxies()` in `bootstrap/app.php` with standard private IP ranges and `X-Forwarded-*` headers.
+- [x] **MED-01, MED-02, MED-03 Hardening**
+  - MED-01: Recorded `change_amount` on `SalesOrder` and netted against cash drawer calculations.
+  - MED-02: Automatically revokes stale `pin-session` tokens upon new PIN verification in `AuthController`.
+  - MED-03: Reconciles lost/damaged-in-transit goods in `ReceiveStockTransferAction` with `StockAdjustment` (Damage / Scrap) and asset reduction.
+- [x] Pest Feature Test Suite:
+  - `tests/Feature/SecurityHardeningAuditTest.php`: 12 passed (38 assertions).
+  - Full Test Suite: **93 passed (452 assertions) — 100% pass rate in 5.55s**.

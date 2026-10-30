@@ -6,6 +6,7 @@ use App\Domains\SalesAndPos\Actions\CreatePaymentTransactionAction;
 use App\Domains\SalesAndPos\Gateways\PaymentGatewayManager;
 use App\Domains\SalesAndPos\Models\PaymentSplit;
 use App\Domains\SalesAndPos\Models\PaymentTransaction;
+use App\Domains\SecurityAndAudit\Models\AuditLog;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\GeneratePaymentQrRequest;
 use App\Http\Requests\V1\SimulatePaymentWebhookRequest;
@@ -45,9 +46,9 @@ class PaymentGatewayController extends Controller
     }
 
     /**
-     * Simulate or receive gateway webhook callback to update transaction and order payment splits.
+     * Receive verified gateway webhook callback to update transaction and order payment splits.
      */
-    public function simulateWebhook(SimulatePaymentWebhookRequest $request, PaymentGatewayManager $gatewayManager): JsonResponse
+    public function handleWebhook(SimulatePaymentWebhookRequest $request, PaymentGatewayManager $gatewayManager): JsonResponse
     {
         $driver = $gatewayManager->driver($request->validated('provider'));
         $verified = $driver->verifyWebhook($request->validated());
@@ -71,11 +72,36 @@ class PaymentGatewayController extends Controller
             }
         }
 
+        AuditLog::create([
+            'staff_id' => null,
+            'module' => 'payments',
+            'action' => 'webhook_processed',
+            'severity' => $verified['success'] ? 'info' : 'warning',
+            'resource_type' => 'PaymentTransaction',
+            'resource_id' => $transaction?->id,
+            'description' => "Cryptographically verified external payment webhook processed from {$request->validated('provider')} for ref: {$request->validated('gateway_ref')}",
+            'diffs' => [
+                'provider' => $request->validated('provider'),
+                'status' => $verified['status'],
+                'gateway_ref' => $request->validated('gateway_ref'),
+            ],
+            'ip_address' => $request->ip(),
+            'created_at' => now(),
+        ]);
+
         return response()->json([
             'success' => true,
             'message' => "Webhook processed. Status: {$verified['status']}.",
             'verified' => $verified,
             'transaction' => $transaction ? new PaymentTransactionResource($transaction) : null,
         ]);
+    }
+
+    /**
+     * Alias for simulateWebhook backwards compatibility
+     */
+    public function simulateWebhook(SimulatePaymentWebhookRequest $request, PaymentGatewayManager $gatewayManager): JsonResponse
+    {
+        return $this->handleWebhook($request, $gatewayManager);
     }
 }

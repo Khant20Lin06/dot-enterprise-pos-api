@@ -124,6 +124,9 @@ class ProcessCheckoutAction
                 );
             }
 
+            // MED-01: Calculate and record change returned to customer on cash overpayment
+            $changeAmount = max(0.00, round($totalTendered - $totalAmount, 2));
+
             // 4. Validate and Update Customer Credit Balance if sold on credit
             $customer = null;
             if ($customerId) {
@@ -177,6 +180,7 @@ class ProcessCheckoutAction
                 'tax_amount' => $taxTotal,
                 'total_amount' => $totalAmount,
                 'paid_amount' => $paidAmount,
+                'change_amount' => $changeAmount,
                 'due_amount' => $dueAmount,
                 'points_earned' => $pointsEarned,
                 'points_redeemed' => $pointsRedeemed,

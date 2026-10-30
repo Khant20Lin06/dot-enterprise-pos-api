@@ -117,6 +117,9 @@ class AuthController extends Controller
             'workstation' => $workstation,
         ]);
 
+        // MED-02 Hardening: Revoke stale PIN session tokens to prevent unbounded token accumulation
+        $matchedStaff->tokens()->where('name', 'like', 'pin-session%')->delete();
+
         $token = $matchedStaff->createToken("pin-session-{$matchedStaff->id}")->plainTextToken;
 
         AuditLog::create([
