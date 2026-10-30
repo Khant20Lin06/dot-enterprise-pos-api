@@ -28,6 +28,7 @@ class SalesOrderResource extends JsonResource
                 'id' => $this->cashier->id,
                 'name' => $this->cashier->name,
             ] : null,
+            'posSessionId' => $this->pos_session_id,
             'subtotal' => (float) $this->subtotal,
             'laborTotal' => (float) $this->labor_total,
             'discountAmount' => (float) $this->discount_amount,

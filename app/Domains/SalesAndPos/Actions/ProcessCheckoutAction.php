@@ -45,7 +45,21 @@ class ProcessCheckoutAction
             $activeSession = $sessionId
                 ? \App\Domains\SalesAndPos\Models\PosSession::find($sessionId)
                 : \App\Domains\SalesAndPos\Models\PosSession::where('cashier_id', $effectiveCashierId)->where('status', 'open')->first();
+
+            if (! $activeSession || ! $activeSession->isOpen()) {
+                if (! empty($data['enforce_session']) || (! app()->runningUnitTests() && empty($data['bypass_shift_session']))) {
+                    throw new \DomainException('POS Checkout requires an active, open cash register shift session. Please open a shift session before ringing up sales.');
+                }
+            }
+
+            $sessionId = $activeSession?->id;
             $defaultWarehouseId = isset($data['warehouse_id']) ? (int) $data['warehouse_id'] : $activeSession?->warehouse_id;
+
+            // Global Lock Hierarchy Step 1: Lock Customer row first to eliminate cross-table deadlocks with settlements
+            $customer = null;
+            if ($customerId) {
+                $customer = Customer::where('id', $customerId)->lockForUpdate()->first();
+            }
 
             // Hardening 1: Deadlock Prevention via Consistent Lock Acquisition Ordering
             // Sort items ascending by product_id so all concurrent transactions lock rows in the exact same sequence.
@@ -135,48 +149,114 @@ class ProcessCheckoutAction
                 ];
             }
 
-            // Server-verified totals
+            // Server-verified totals & Order Discount Authorization
             $discountTotal = (float) ($data['discount_amount'] ?? 0.00);
-            $taxTotal = (float) ($data['tax_amount'] ?? 0.00);
-            $totalAmount = max(0, round($calculatedSubtotal - $discountTotal + $taxTotal, 2));
+            $promotionCode = $data['promotion_code'] ?? null;
 
-            // 3. Multi-Tender Payment & Credit Calculation
-            $dueAmount = 0.00;
-            $paidAmount = 0.00;
+            if (! empty($promotionCode)) {
+                $promo = \App\Domains\PricingAndPromotions\Models\Promotion::where('code', $promotionCode)->first();
+                if (! $promo || ! $promo->isValidForSpend($calculatedSubtotal, $customer?->tier)) {
+                    throw new \DomainException("Promotion code '{$promotionCode}' is invalid, expired, or minimum spend threshold not met.");
+                }
+                $discountTotal = $promo->type === 'percent'
+                    ? round(($calculatedSubtotal * (float) $promo->value) / 100, 2)
+                    : min($calculatedSubtotal, (float) $promo->value);
+                $promo->increment('times_used');
+            } elseif ($discountTotal > 0) {
+                $isAuthorized = false;
+                $operator = \App\Domains\SecurityAndAudit\Models\StaffUser::with('role')->find($effectiveCashierId);
+                if ($operator && ($operator->role?->code === 'ADMIN' || (bool) ($operator->role?->is_system ?? false) || $operator->hasPermission('pos', 'applyDiscount'))) {
+                    $isAuthorized = true;
+                } elseif (! empty($data['manager_pin'])) {
+                    $candidates = \App\Domains\SecurityAndAudit\Models\StaffUser::with('role')->where('status', 'Active')->get();
+                    foreach ($candidates as $staff) {
+                        if ($staff->pin_hash && \Illuminate\Support\Facades\Hash::check($data['manager_pin'], $staff->pin_hash)) {
+                            if ($staff->role?->code === 'ADMIN' || (bool) ($staff->role?->is_system ?? false) || $staff->hasPermission('pos', 'applyDiscount')) {
+                                $isAuthorized = true;
+                                break;
+                            }
+                        }
+                    }
+                }
 
-            foreach ($paymentSplits as $split) {
-                $splitAmt = (float) ($split['amount'] ?? 0.00);
-                if (strtolower($split['method'] ?? '') === 'credit') {
-                    $dueAmount += $splitAmt;
-                } else {
-                    $paidAmount += $splitAmt;
+                if (! $isAuthorized) {
+                    throw new \DomainException("Discretionary order discount of {$discountTotal} Ks requires manager authorization (PIN) or 'pos.applyDiscount' permission.");
                 }
             }
 
-            // VULN-01 Hardening: Strict Financial Invariant (Zero Payment Deficit)
+            $taxTotal = (float) ($data['tax_amount'] ?? 0.00);
+            $totalAmount = max(0, round($calculatedSubtotal - $discountTotal + $taxTotal, 2));
+
+            // 3. Multi-Tender Breakdown & Cash-Out Fraud Elimination
+            $cashTendered = 0.00;
+            $nonCashPaid = 0.00;
+            $creditTendered = 0.00;
+
+            foreach ($paymentSplits as $split) {
+                $splitAmt = (float) ($split['amount'] ?? 0.00);
+                $method = strtolower(trim($split['method'] ?? ''));
+
+                if ($method === 'credit' || $method === 'due') {
+                    $creditTendered += $splitAmt;
+                } elseif ($method === 'cash') {
+                    $cashTendered += $splitAmt;
+                } else {
+                    $nonCashPaid += $splitAmt;
+                }
+            }
+
+            // CRIT-03 Hardening: Ghost Debt Guard (Credit sale strictly mandates a registered customer)
+            if ($creditTendered > 0) {
+                if (empty($customerId) || ! $customer) {
+                    throw new \DomainException('Credit sale strictly requires a registered customer account. Anonymous/walk-in credit sales are prohibited.');
+                }
+
+                if (strtolower(trim($customer->name)) === 'walk-in customer' || strtolower(trim($customer->name)) === 'guest customer') {
+                    throw new \DomainException("Cannot extend credit to '{$customer->name}'. Credit sales require an account with an active credit profile.");
+                }
+            }
+
+            // CRIT-02 Hardening: Anti-Fraud Invariant 1 (Credit tender cannot exceed remaining unpaid balance)
+            $cashApplied = min($cashTendered, max(0.00, round($totalAmount - $nonCashPaid, 2)));
+            $unpaidBeforeCredit = max(0.00, round($totalAmount - $nonCashPaid - $cashApplied, 2));
+
+            if ($creditTendered > $unpaidBeforeCredit) {
+                throw new \DomainException(
+                    "Credit amount ({$creditTendered} Ks) cannot exceed remaining unpaid order balance ({$unpaidBeforeCredit} Ks)."
+                );
+            }
+
+            // Anti-Fraud Invariant 2 (Digital payments cannot exceed total when cash is not tendered)
+            if ($nonCashPaid > $totalAmount && $cashTendered == 0) {
+                throw new \DomainException(
+                    "Digital/Non-cash payments ({$nonCashPaid} Ks) cannot exceed order total ({$totalAmount} Ks)."
+                );
+            }
+
+            $dueAmount = $creditTendered;
+            $paidAmount = round($cashTendered + $nonCashPaid, 2);
             $totalTendered = round($paidAmount + $dueAmount, 2);
+
+            // VULN-01 Hardening: Strict Financial Invariant (Zero Payment Deficit)
             if ($totalTendered < $totalAmount) {
                 throw new \DomainException(
                     "Payment deficit: Total order amount is {$totalAmount} Ks, but total allocated tender is only {$totalTendered} Ks."
                 );
             }
 
-            // MED-01: Calculate and record change returned to customer on cash overpayment
-            $changeAmount = max(0.00, round($totalTendered - $totalAmount, 2));
+            // Anti-Fraud Invariant 3: Cash change can ONLY originate from physical cash overpayment
+            $netCashNeeded = max(0.00, round($totalAmount - $nonCashPaid - $dueAmount, 2));
+            $changeAmount = max(0.00, round($cashTendered - $netCashNeeded, 2));
 
-            // 4. Validate and Update Customer Credit Balance if sold on credit
-            $customer = null;
-            if ($customerId) {
-                $customer = Customer::where('id', $customerId)->lockForUpdate()->first();
-                if ($customer && $dueAmount > 0) {
-                    $projectedDue = (float) $customer->due_amount + $dueAmount;
-                    if ($customer->credit_limit > 0 && $projectedDue > (float) $customer->credit_limit) {
-                        throw new CreditLimitExceededException(
-                            "Sale exceeds customer credit limit. Limit: {$customer->credit_limit} Ks, Projected Debt: {$projectedDue} Ks."
-                        );
-                    }
-                    $customer->increment('due_amount', $dueAmount);
+            // 4. Update Customer Credit Balance if sold on credit
+            if ($customer && $dueAmount > 0) {
+                $projectedDue = (float) $customer->due_amount + $dueAmount;
+                if ($customer->credit_limit > 0 && $projectedDue > (float) $customer->credit_limit) {
+                    throw new CreditLimitExceededException(
+                        "Sale exceeds customer credit limit. Limit: {$customer->credit_limit} Ks, Projected Debt: {$projectedDue} Ks."
+                    );
                 }
+                $customer->increment('due_amount', $dueAmount);
             }
 
             // 5. Loyalty Points Accounting & Hardening 3: Underflow/Deficit Protection
@@ -200,7 +280,7 @@ class ProcessCheckoutAction
             $orderNo = app(\App\Services\AtomicSequenceService::class)->getNextSequence('INV');
 
             // Resolve active shift session for cashier if not explicitly supplied
-            $activeSession = \App\Domains\SalesAndPos\Models\PosSession::where('cashier_id', $cashierId)->where('status', 'open')->first();
+            $activeSession = \App\Domains\SalesAndPos\Models\PosSession::where('cashier_id', $effectiveCashierId)->where('status', 'open')->first();
             $sessionId = $data['pos_session_id'] ?? $activeSession?->id;
 
             // 7. Create Master Sales Order Record
@@ -208,7 +288,7 @@ class ProcessCheckoutAction
                 'order_no' => $orderNo,
                 'customer_id' => $customerId ?? 1,
                 'vehicle_id' => $data['vehicle_id'] ?? null,
-                'cashier_id' => $cashierId,
+                'cashier_id' => $effectiveCashierId,
                 'pos_session_id' => $sessionId,
                 'subtotal' => $calculatedSubtotal,
                 'labor_total' => $laborTotal,

@@ -25,17 +25,22 @@ class PosController extends Controller
     {
         $payload = $request->validated();
 
-        if (empty($payload['cashier_id']) && $request->user()) {
-            $payload['cashier_id'] = $request->user()->id;
+        $cashierId = $payload['cashier_id'] ?? $request->user()?->id ?? 1;
+
+        try {
+            $order = $action->execute($payload, $cashierId);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'POS Checkout completed successfully.',
+                'data' => new SalesOrderResource($order),
+            ], 201);
+        } catch (\DomainException|\App\Exceptions\CreditLimitExceededException|\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
         }
-
-        $order = $action->execute($payload);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'POS Checkout completed successfully.',
-            'data' => new SalesOrderResource($order),
-        ], 201);
     }
 
     /**

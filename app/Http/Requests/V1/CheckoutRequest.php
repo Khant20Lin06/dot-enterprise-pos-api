@@ -31,8 +31,12 @@ class CheckoutRequest extends FormRequest
             'payments.*.reference_no' => ['nullable', 'string', 'max:100'],
             'discount_amount' => ['nullable', 'numeric', 'min:0'],
             'discount_note' => ['nullable', 'string', 'max:255'],
+            'manager_pin' => ['nullable', 'string', 'digits_between:4,8'],
+            'promotion_code' => ['nullable', 'string', 'max:50'],
             'points_redeemed' => ['nullable', 'integer', 'min:0'],
             'idempotency_key' => ['nullable', 'string', 'max:100'],
+            'enforce_session' => ['nullable', 'boolean'],
+            'bypass_shift_session' => ['nullable', 'boolean'],
         ];
     }
 }

@@ -437,6 +437,8 @@ Route::prefix('v1')->group(function () {
                 ->middleware('permission:inventory,view');
             Route::post('/', [StockAdjustmentController::class, 'store'])
                 ->middleware(['throttle:60,1', 'permission:inventory,adjustStock']);
+            Route::get('/{id}', [StockAdjustmentController::class, 'show'])
+                ->middleware('permission:inventory,view');
         });
     });
 });

@@ -84,8 +84,8 @@ class AuthController extends Controller
                 $matchedStaff = $staff;
             }
         } else {
-            // Limited candidate pool of active staff members
-            $candidates = StaffUser::with('role')->where('status', 'Active')->limit(20)->get();
+            // Limited candidate pool of active staff members with configured PINs
+            $candidates = StaffUser::with('role')->where('status', 'Active')->whereNotNull('pin_hash')->limit(50)->get();
 
             foreach ($candidates as $staff) {
                 if ($staff->pin_hash && Hash::check($request->pin, $staff->pin_hash)) {

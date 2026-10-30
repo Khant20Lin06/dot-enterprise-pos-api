@@ -36,7 +36,12 @@ class Promotion extends Model
         if (!$this->is_active) return false;
         
         $today = now()->toDateString();
-        if ($this->start_date > $today || $this->end_date < $today) return false;
+        $startDate = $this->start_date ? \Illuminate\Support\Carbon::parse($this->start_date)->toDateString() : null;
+        $endDate = $this->end_date ? \Illuminate\Support\Carbon::parse($this->end_date)->toDateString() : null;
+
+        if (($startDate && $startDate > $today) || ($endDate && $endDate < $today)) {
+            return false;
+        }
         
         if ($this->usage_limit !== null && $this->times_used >= $this->usage_limit) return false;
         

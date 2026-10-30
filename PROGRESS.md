@@ -32,6 +32,7 @@
 | **Phase I** | Forensic Hardening: Red-Team Security, Concurrency Locking & Anti-Drift Variant Stock | 🟢 Completed | 100% |
 | **Phase J** | Enterprise Accounting Integrity: Credit Overpayment Change, Supervisor POS Order Voiding & Scoped Held Carts | 🟢 Completed | 100% |
 | **Phase K** | Complete Domain Coverage: Activation of Orphan Models (Fleets, Mechanics, Outsourced Parts, Purchase Returns, Pricing) | 🟢 Completed | 100% |
+| **Phase L** | Forensic Remediation Stage 1: Anti-Fraud, Shift Enforcement & Cash Integrity Hotfixes | 🟢 Completed | 100% |
 
 ---
 
@@ -379,3 +380,25 @@
 - [x] **Pest Feature Test Suite:**
   - `tests/Feature/Phase3OrphanModelsActivationTest.php`: 5 passed (41 assertions).
   - Full Test Suite: **133 passed (670 assertions) — 100% pass rate in 8.20s**.
+
+---
+
+### Phase L: Forensic Remediation Stage 1: Anti-Fraud, Shift Enforcement & Cash Integrity Hotfixes
+- [x] **Discretionary Order Discount Authorization (CRIT-01):**
+  - Hardened `ProcessCheckoutAction` to reject unapproved order-level `discount_amount > 0` unless authorized by a supervisor with `pos.applyDiscount` permission, a valid 4-digit `manager_pin`, or linked to an active `Promotion` code.
+  - Automatically verifies promotional campaign date bounds, minimum spend thresholds, and customer tier targeting.
+- [x] **Cash-Out & Register Drawer Extraction Fraud Prevention (CRIT-02):**
+  - Formulated strict mathematical tender invariant: physical currency change can **ONLY** be returned from cash overpayment.
+  - Strictly blocked non-cash/credit tenders from exceeding the remaining order balance (`422 Unprocessable Entity`).
+- [x] **Anonymous Ghost Debt Elimination (CRIT-03):**
+  - Blocked credit checkout for anonymous/null customers or default walk-in guest accounts. Credit sales strictly mandate a registered customer account with an active credit line.
+- [x] **Mandatory Shift Session Enforcement (CRIT-04):**
+  - Prohibited cashier checkouts without an active open cash register shift session, preventing untracked cash sales and day-end drawer variance evasion.
+- [x] **Negative Stock Adjustment 500 Crash Hotfix (BIZ-03):**
+  - Converted internal `DB::transaction()` response return into a clean `DomainException`, returning proper `422 Unprocessable Entity` on negative stock attempts instead of a fatal PHP `TypeError` crash.
+  - Added `StockAdjustmentController::show` endpoint (`GET /api/v1/stock-adjustments/{id}`) for voucher inspection.
+- [x] **O(N) Shared-Terminal PIN Verification Hardening (HIGH-01):**
+  - Filtered candidate pool by `whereNotNull('pin_hash')` with 50-limit threshold to prevent lockout of staff members with IDs beyond 20.
+- [x] **Pest Feature Test Suite:**
+  - `tests/Feature/Phase4SecurityAndFraudHotfixesTest.php`: 5 passed (33 assertions).
+  - Full Test Suite: **138 passed (703 assertions) — 100% pass rate in 8.39s**.

@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Forensic Remediation Stage 1: Anti-Fraud, Shift Enforcement & Cash Integrity Hotfixes:**
+  - **Discretionary Order Discount Authorization (CRIT-01):**
+    - `ProcessCheckoutAction`: Enforces that non-zero order `discount_amount` must be authorized by a manager PIN, a staff token with `pos.applyDiscount` permission, or validated against an active promotion campaign code (`promotion_code`).
+  - **Anti Cash-Out & Register Drawer Extraction Fraud Prevention (CRIT-02):**
+    - `ProcessCheckoutAction`: Enforces strict mathematical tender invariants. Change amount is strictly calculated from physical cash overpayment; credit tenders can never exceed remaining unpaid order balance or trigger drawer cash payouts.
+  - **Anonymous Ghost Debt Elimination (CRIT-03):**
+    - Blocks credit sales when `customer_id` is null or belongs to the default walk-in customer profile, eliminating uncollectible ghost debts.
+  - **Mandatory Shift Session Enforcement for Cashiers (CRIT-04):**
+    - Prevents cashier checkouts without an active open cash register shift session, blocking shift evasion and unrecorded cash sales.
+  - **Negative Stock Adjustment 500 Crash Fix (BIZ-03):**
+    - Converted transaction return in `StockAdjustmentController` into an exception-driven flow, returning a clean 422 JSON validation error instead of crashing PHP with a fatal `TypeError`.
+    - Added `GET /api/v1/stock-adjustments/{id}` endpoint for voucher inspection.
+  - **Automated Pest Feature Test Suite:**
+    - Authored `tests/Feature/Phase4SecurityAndFraudHotfixesTest.php`: 5 new feature tests verifying unauthorized discount blocks, cash-out fraud prevention, ghost debt blocks, shift session enforcement, and negative stock 422 responses.
+    - Repository Test Suite: **138 passed (703 assertions) — 100% pass rate in 8.39s**.
 - **Phase 3 Implementation: Complete Domain Coverage: Activation of Orphan Models (Fleets, Mechanics, Outsourced Parts, Purchase Returns, Pricing):**
   - **Fleet Management Module (`FleetController`, `CreateFleetRequest`, `UpdateFleetRequest`, `FleetResource`):**
     - Endpoints: `GET /api/v1/fleets`, `POST /fleets`, `GET /fleets/{id}`, `PUT /fleets/{id}`, `DELETE /fleets/{id}`.

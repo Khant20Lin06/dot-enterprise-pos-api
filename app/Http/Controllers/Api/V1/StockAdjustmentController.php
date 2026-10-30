@@ -44,71 +44,84 @@ class StockAdjustmentController extends Controller
         $validated = $request->validated();
         $staffId = $request->user()?->id;
 
-        $adjustment = DB::transaction(function () use ($validated, $staffId) {
-            $product = Product::where('id', $validated['product_id'])
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            $prevStock = (int) $product->stock;
-            $adjustedQty = (int) $validated['adjusted_qty'];
-            $newStock = $prevStock + $adjustedQty;
-
-            if ($newStock < 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => "Negative stock violation: Product '{$product->name}' currently has {$prevStock} units in stock. Cannot adjust by {$adjustedQty} units.",
-                ], 422);
-            }
-
-            // Update Master Product Stock
-            $product->update(['stock' => $newStock]);
-
-            // Reconcile Target Warehouse Stock
-            $warehouseId = $validated['warehouse_id'] ?? null;
-            $targetWarehouse = $warehouseId
-                ? Warehouse::find($warehouseId)
-                : (Warehouse::where('is_central', true)->first() ?? Warehouse::first());
-
-            if ($targetWarehouse) {
-                $whStock = WarehouseStock::where('warehouse_id', $targetWarehouse->id)
-                    ->where('product_id', $product->id)
-                    ->whereNull('product_option_id')
+        try {
+            $adjustment = DB::transaction(function () use ($validated, $staffId) {
+                $product = Product::where('id', $validated['product_id'])
                     ->lockForUpdate()
-                    ->first();
+                    ->firstOrFail();
 
-                if (! $whStock) {
-                    WarehouseStock::create([
-                        'warehouse_id' => $targetWarehouse->id,
-                        'product_id' => $product->id,
-                        'product_option_id' => null,
-                        'stock_qty' => max(0, $adjustedQty),
-                    ]);
-                } else {
-                    $whStock->increment('stock_qty', $adjustedQty);
+                $prevStock = (int) $product->stock;
+                $adjustedQty = (int) $validated['adjusted_qty'];
+                $newStock = $prevStock + $adjustedQty;
+
+                if ($newStock < 0) {
+                    throw new \DomainException("Negative stock violation: Product '{$product->name}' currently has {$prevStock} units in stock. Cannot adjust by {$adjustedQty} units.");
                 }
-            }
 
-            $adjustment = StockAdjustment::create([
-                'product_id' => $product->id,
-                'type' => $validated['type'],
-                'prev_stock' => $prevStock,
-                'adjusted_qty' => $adjustedQty,
-                'new_stock' => $newStock,
-                'reason' => $validated['reason'],
-                'staff_id' => $staffId,
-            ]);
+                // Update Master Product Stock
+                $product->update(['stock' => $newStock]);
 
-            return $adjustment;
-        });
+                // Reconcile Target Warehouse Stock
+                $warehouseId = $validated['warehouse_id'] ?? null;
+                $targetWarehouse = $warehouseId
+                    ? Warehouse::find($warehouseId)
+                    : (Warehouse::where('is_central', true)->first() ?? Warehouse::first());
 
-        if ($adjustment instanceof JsonResponse) {
-            return $adjustment;
+                if ($targetWarehouse) {
+                    $whStock = WarehouseStock::where('warehouse_id', $targetWarehouse->id)
+                        ->where('product_id', $product->id)
+                        ->whereNull('product_option_id')
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (! $whStock) {
+                        WarehouseStock::create([
+                            'warehouse_id' => $targetWarehouse->id,
+                            'product_id' => $product->id,
+                            'product_option_id' => null,
+                            'stock_qty' => max(0, $adjustedQty),
+                        ]);
+                    } else {
+                        $whStock->increment('stock_qty', $adjustedQty);
+                    }
+                }
+
+                $adjustment = StockAdjustment::create([
+                    'product_id' => $product->id,
+                    'type' => $validated['type'],
+                    'prev_stock' => $prevStock,
+                    'adjusted_qty' => $adjustedQty,
+                    'new_stock' => $newStock,
+                    'reason' => $validated['reason'],
+                    'staff_id' => $staffId,
+                ]);
+
+                return $adjustment;
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Stock adjustment recorded successfully.',
+                'data' => new StockAdjustmentResource($adjustment->load(['product', 'staff'])),
+            ], 201);
+        } catch (\DomainException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
         }
+    }
+
+    /**
+     * Show single stock adjustment audit voucher details.
+     */
+    public function show(int $id): JsonResponse
+    {
+        $adjustment = StockAdjustment::with(['product', 'staff'])->findOrFail($id);
 
         return response()->json([
             'success' => true,
-            'message' => 'Stock adjustment recorded successfully.',
-            'data' => new StockAdjustmentResource($adjustment->load(['product', 'staff'])),
-        ], 201);
+            'data' => new StockAdjustmentResource($adjustment),
+        ]);
     }
 }
