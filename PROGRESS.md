@@ -34,6 +34,7 @@
 | **Phase K** | Complete Domain Coverage: Activation of Orphan Models (Fleets, Mechanics, Outsourced Parts, Purchase Returns, Pricing) | 🟢 Completed | 100% |
 | **Phase L** | Forensic Remediation Stage 1: Anti-Fraud, Shift Enforcement & Cash Integrity Hotfixes | 🟢 Completed | 100% |
 | **Phase M** | Forensic Remediation Stage 2: Concurrency, Deadlocks & Inventory Integrity Hardening | 🟢 Completed | 100% |
+| **Phase N** | Forensic Remediation Stage 3: Operational CRUD Completeness & Missing Enterprise Features | 🟢 Completed | 100% |
 
 ---
 
@@ -421,3 +422,29 @@
 - [x] **Pest Feature Test Suite:**
   - `tests/Feature/Phase5ConcurrencyAndIntegrityHardeningTest.php`: 4 passed (14 assertions).
   - Full Test Suite: **142 passed (717 assertions) — 100% pass rate in 8.83s**.
+
+---
+
+### Phase N: Forensic Remediation Stage 3: Operational CRUD Completeness & Missing Enterprise Features
+- [x] **Enterprise Audit Logs API (CRUD-01):**
+  - Implemented `AuditLogResource` and `AuditLogController` exposing `GET /api/v1/audit-logs` and `GET /api/v1/audit-logs/{id}`.
+  - Implemented comprehensive multi-field filtering (`module`, `action`, `severity`, `staff_id`, `resource_type`, `date_from`, `date_to`, `search`) and pagination.
+  - Secured under `permission:settings,manageRoles`.
+- [x] **Global Accounts Receivable & Debt Settlements Journal (CRUD-02):**
+  - Implemented `CreditSettlementResource` and `CreditSettlementController` exposing `GET /api/v1/credit-settlements` and `GET /api/v1/credit-settlements/{id}`.
+  - Exposes complete audit trail of tendered vs returned cash, cashier ID, POS shift session ID, and customer balance standing.
+  - Implemented multi-field filtering (`customer_id`, `cashier_id`, `pos_session_id`, `payment_method`, `date_from`, `date_to`, `search`).
+  - Secured under `permission:finances,view`.
+- [x] **Draft Purchase Order Updating & Atomic Recalculation (CRUD-03):**
+  - Implemented `UpdatePurchaseRequest` and `PurchaseController::update` on `PUT /api/v1/purchases/{id}`.
+  - Strict lifecycle guard: restricts modifications strictly to POs in `Draft` or `Pending` state (`422 Unprocessable Entity` if already `Received`).
+  - Pessimistic locking (`lockForUpdate()`) with atomic line item recreation and total amount recalculation in `DB::transaction()`.
+  - Secured under `permission:purchases,edit`.
+- [x] **Individual Product Variant Management & Physical Stock Safeguard (CRUD-04):**
+  - Implemented `UpdateProductVariantRequest` and `ProductVariantController` exposing `PUT /api/v1/products/{id}/variants/{variantId}` and `DELETE /api/v1/products/{id}/variants/{variantId}`.
+  - Handles independent SKU, barcode, price, cost price, and active status updates with uniqueness validation.
+  - Implemented physical stock safeguard: blocks deletion if variant has physical stock > 0 (`422 Unprocessable Entity`), with automatic synchronization of parent product `has_variants` flag when last variant is removed.
+  - Secured under `permission:inventory,edit`.
+- [x] **Pest Feature Test Suite:**
+  - `tests/Feature/Phase6OperationalCrudCompletenessTest.php`: 4 passed (96 assertions).
+  - Full Test Suite: **146 passed (813 assertions) — 100% pass rate in 8.34s**.

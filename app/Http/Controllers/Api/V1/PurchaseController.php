@@ -7,6 +7,7 @@ use App\Domains\Purchasing\Models\Purchase;
 use App\Domains\Purchasing\Models\PurchaseItem;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\CreatePurchaseRequest;
+use App\Http\Requests\V1\UpdatePurchaseRequest;
 use App\Http\Resources\V1\PurchaseResource;
 use App\Services\AtomicSequenceService;
 use DomainException;
@@ -114,6 +115,71 @@ class PurchaseController extends Controller
             'success' => true,
             'data' => new PurchaseResource($purchase),
         ]);
+    }
+
+    /**
+     * Update an existing Draft or Pending Purchase Order.
+     */
+    public function update(UpdatePurchaseRequest $request, int $id): JsonResponse
+    {
+        $validated = $request->validated();
+
+        try {
+            $purchase = DB::transaction(function () use ($validated, $id) {
+                $purchase = Purchase::where('id', $id)->lockForUpdate()->firstOrFail();
+
+                if (! in_array($purchase->status, ['Draft', 'Pending'])) {
+                    throw new DomainException("Cannot edit Purchase Order #{$purchase->po_no} because it is in '{$purchase->status}' status. Only Draft or Pending POs can be edited.");
+                }
+
+                if (isset($validated['supplier_id'])) {
+                    $purchase->supplier_id = $validated['supplier_id'];
+                }
+
+                if (array_key_exists('notes', $validated)) {
+                    $purchase->notes = $validated['notes'];
+                }
+
+                if (isset($validated['items'])) {
+                    $purchase->items()->delete();
+
+                    $totalAmount = 0.00;
+                    foreach ($validated['items'] as $item) {
+                        $qty = (int) $item['qty'];
+                        $unitPrice = (float) $item['unit_price'];
+                        $subtotal = round($qty * $unitPrice, 2);
+                        $totalAmount += $subtotal;
+
+                        PurchaseItem::create([
+                            'purchase_id' => $purchase->id,
+                            'product_id' => $item['product_id'],
+                            'qty' => $qty,
+                            'unit_price' => $unitPrice,
+                            'subtotal' => $subtotal,
+                        ]);
+                    }
+
+                    $purchase->total_amount = $totalAmount;
+                }
+
+                $purchase->save();
+
+                return $purchase;
+            });
+
+            $purchase->load(['supplier', 'items.product']);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Purchase Order #{$purchase->po_no} updated successfully.",
+                'data' => new PurchaseResource($purchase),
+            ]);
+        } catch (DomainException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 
     /**

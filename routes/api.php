@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AttributeController;
+use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CategoryController;
+use App\Http\Controllers\Api\V1\CreditSettlementController;
 use App\Http\Controllers\Api\V1\CustomerController;
 use App\Http\Controllers\Api\V1\CustomerCreditController;
 use App\Http\Controllers\Api\V1\PaymentGatewayController;
@@ -10,6 +12,7 @@ use App\Http\Controllers\Api\V1\PosController;
 use App\Http\Controllers\Api\V1\PosSessionController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProductUomConversionController;
+use App\Http\Controllers\Api\V1\ProductVariantController;
 use App\Http\Controllers\Api\V1\PurchaseController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\RoleController;
@@ -82,6 +85,10 @@ Route::prefix('v1')->group(function () {
                 ->middleware('permission:inventory,view');
             Route::post('/{id}/variants/matrix', [ProductController::class, 'generateMatrix'])
                 ->middleware('permission:inventory,create');
+            Route::put('/{id}/variants/{variantId}', [ProductVariantController::class, 'update'])
+                ->middleware('permission:inventory,edit');
+            Route::delete('/{id}/variants/{variantId}', [ProductVariantController::class, 'destroy'])
+                ->middleware('permission:inventory,edit');
 
             // Multi-UOM / Packaging Unit Conversions
             Route::get('/{id}/uom-conversions', [ProductUomConversionController::class, 'index'])
@@ -386,6 +393,8 @@ Route::prefix('v1')->group(function () {
                 ->middleware(['throttle:60,1', 'permission:purchases,create']);
             Route::get('/{id}', [PurchaseController::class, 'show'])
                 ->middleware('permission:purchases,view');
+            Route::put('/{id}', [PurchaseController::class, 'update'])
+                ->middleware(['throttle:60,1', 'permission:purchases,edit']);
             Route::post('/{id}/receive', [PurchaseController::class, 'receive'])
                 ->middleware(['throttle:60,1', 'permission:purchases,approvePO']);
             Route::post('/{id}/cancel', [PurchaseController::class, 'cancel'])
@@ -439,6 +448,22 @@ Route::prefix('v1')->group(function () {
                 ->middleware(['throttle:60,1', 'permission:inventory,adjustStock']);
             Route::get('/{id}', [StockAdjustmentController::class, 'show'])
                 ->middleware('permission:inventory,view');
+        });
+
+        // Global Accounts Receivable & Debt Settlements Journal
+        Route::prefix('credit-settlements')->group(function () {
+            Route::get('/', [CreditSettlementController::class, 'index'])
+                ->middleware('permission:finances,view');
+            Route::get('/{id}', [CreditSettlementController::class, 'show'])
+                ->middleware('permission:finances,view');
+        });
+
+        // Security Audit Logs & Compliance Trails
+        Route::prefix('audit-logs')->group(function () {
+            Route::get('/', [AuditLogController::class, 'index'])
+                ->middleware('permission:settings,manageRoles');
+            Route::get('/{id}', [AuditLogController::class, 'show'])
+                ->middleware('permission:settings,manageRoles');
         });
     });
 });

@@ -8,6 +8,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Forensic Remediation Stage 3: Operational CRUD Completeness & Missing Enterprise Features:**
+  - **Enterprise Audit Logs API (CRUD-01):**
+    - `AuditLogResource` & `AuditLogController`: Exposes `GET /api/v1/audit-logs` and `GET /api/v1/audit-logs/{id}` with multi-field filtering (`module`, `action`, `severity`, `staff_id`, `resource_type`, `date_from`, `date_to`, `search`) and pagination.
+    - Secured under `permission:settings,manageRoles`.
+  - **Global Accounts Receivable & Debt Settlements Journal (CRUD-02):**
+    - `CreditSettlementResource` & `CreditSettlementController`: Exposes `GET /api/v1/credit-settlements` and `GET /api/v1/credit-settlements/{id}` with multi-criteria filtering (`customer_id`, `cashier_id`, `pos_session_id`, `payment_method`, `date_from`, `date_to`, `search`).
+    - Provides a centralized AR cash collections journal with full audit trail of tendered vs returned cash, cashier ID, POS shift session ID, and customer balance standing.
+    - Secured under `permission:finances,view`.
+  - **Draft Purchase Order Updating & Atomic Recalculation (CRUD-03):**
+    - `UpdatePurchaseRequest` & `PurchaseController::update`: Exposes `PUT /api/v1/purchases/{id}`.
+    - Restricts updates strictly to POs in `Draft` or `Pending` state (`422 Unprocessable Entity` if already `Received`).
+    - Re-evaluates supplier, notes, line items, and atomically recalculates `total_amount` in `DB::transaction()` with pessimistic row locking (`lockForUpdate()`).
+    - Secured under `permission:purchases,edit`.
+  - **Individual Product Variant Management & Physical Stock Safeguard (CRUD-04):**
+    - `UpdateProductVariantRequest` & `ProductVariantController`: Exposes `PUT /api/v1/products/{id}/variants/{variantId}` and `DELETE /api/v1/products/{id}/variants/{variantId}`.
+    - Enables updating SKU, barcode, price, cost price, and active status independently with uniqueness rules.
+    - Safeguards inventory integrity by rejecting deletion when variant has physical stock > 0 (`422 Unprocessable Entity`), and automatically synchronizes parent product's `has_variants` flag when all variants are removed.
+    - Secured under `permission:inventory,edit`.
+  - **Automated Pest Feature Test Suite:**
+    - Authored `tests/Feature/Phase6OperationalCrudCompletenessTest.php`: 4 new feature tests verifying audit log inspection, AR credit settlement journal querying, draft purchase order editing, and variant update/deletion safeguards.
+    - Repository Test Suite: **146 passed (813 assertions) — 100% pass rate in 8.34s**.
 - **Forensic Remediation Stage 2: Concurrency, Deadlocks & Inventory Integrity Hardening:**
   - **Loyalty Points Redemption Monetary Valuation (BIZ-01):**
     - `ProcessCheckoutAction`: Automatically values redeemed loyalty points (1 point = 100 MMK) and deducts the monetary value from `total_amount`, ensuring loyalty point redemption directly benefits customer payments.

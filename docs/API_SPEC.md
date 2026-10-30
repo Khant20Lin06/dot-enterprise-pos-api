@@ -1361,3 +1361,48 @@
   * Supports fixed and percentage rules by product with minimum volume breaks.
 * **Promotions & Campaigns:** `GET|POST /pricing/promotions`, `GET|PUT|DELETE /pricing/promotions/{id}`
   * Supports date-bounded discount campaigns (fixed/percent) with customer tier filtering and usage limits.
+
+---
+
+## 13. Operational Audits & Missing Enterprise Features (Stage 3)
+
+### 13.1. Security Audit Logs API
+* **Permissions:** `settings,manageRoles`
+* **List Audit Logs:** `GET /audit-logs`
+  * Query Filters: `module`, `action`, `severity`, `staff_id`, `resource_type`, `date_from`, `date_to`, `search`, `per_page` (default 20, max 100).
+* **Get Audit Log Detail:** `GET /audit-logs/{id}`
+  * Response contains: `id`, `staff`, `module`, `action`, `severity`, `resourceType`, `resourceId`, `description`, `diffs`, `ipAddress`, `createdAt`.
+
+### 13.2. Global Accounts Receivable & Credit Settlements Journal
+* **Permissions:** `finances,view`
+* **List Credit Settlements:** `GET /credit-settlements`
+  * Query Filters: `customer_id`, `cashier_id`, `pos_session_id`, `payment_method`, `date_from`, `date_to`, `search` (receipt_no or customer name/phone), `per_page`.
+* **Get Settlement Receipt Detail:** `GET /credit-settlements/{id}`
+  * Response contains: `id`, `receiptNo`, `customer` (`id`, `name`, `phone`, `dueAmount`), `amount`, `tenderedAmount`, `changeAmount`, `paymentMethod`, `note`, `cashier`, `posSessionId`, `createdAt`.
+
+### 13.3. Draft Purchase Order Updating
+* **Endpoint:** `PUT /purchases/{id}`
+* **Permissions:** `purchases,edit`
+* **Lifecycle Guard:** Modifiable **ONLY** if PO status is `Draft` or `Pending`. Rejects with `422 Unprocessable Entity` if `Received`.
+* **Request Body:**
+```json
+{
+  "supplier_id": 2,
+  "notes": "Updated procurement specifications",
+  "items": [
+    {
+      "product_id": 1,
+      "qty": 10,
+      "unit_price": 25000.00
+    }
+  ]
+}
+```
+* **Behavior:** Locks PO row with `lockForUpdate()`, removes old line items, inserts updated items, and recalculates total amount atomically within `DB::transaction()`.
+
+### 13.4. Product Variant Individual Update & Deletion
+* **Permissions:** `inventory,edit`
+* **Update Variant:** `PUT /products/{id}/variants/{variantId}`
+  * Request Body: `{"sku": "VAR-001", "barcode": "BAR-001", "price": 45000, "cost_price": 30000, "stock": 10, "is_active": true}`
+* **Delete Variant:** `DELETE /products/{id}/variants/{variantId}`
+  * **Physical Stock Safeguard:** Rejects deletion with `422 Unprocessable Entity` if variant has remaining physical stock (`stock > 0`). Automatically marks parent `product.has_variants = false` if the last remaining variant is deleted.
