@@ -186,6 +186,31 @@ erDiagram
   * `created_at`, `updated_at` (TIMESTAMP)
   * UNIQUE (`product_variant_id`, `attribute_value_id`)
 
+* **`product_uom_conversions`** (Multi-UOM Packaging Conversion Rules)
+  * `id` (BIGINT, PK, AUTO_INCREMENT)
+  * `product_id` (BIGINT, FK -> `products.id`, ON DELETE CASCADE)
+  * `uom_id` (BIGINT, FK -> `units_of_measure.id`, ON DELETE CASCADE) — Packaging UOM (e.g. Box, Drum, Carton)
+  * `conversion_factor` (DECIMAL(12,4)) — Ratio to base unit (e.g. 10.00 for 10 pcs/box)
+  * `barcode` (VARCHAR(100), UNIQUE, NULLABLE, INDEX) — Dedicated packaging barcode for POS scanning
+  * `sell_price` (DECIMAL(14,2), NULLABLE) — Wholesale/bulk packaging sell price
+  * `cost_price` (DECIMAL(14,2), NULLABLE) — Bulk packaging cost
+  * `is_active` (BOOLEAN, DEFAULT TRUE)
+  * `created_at`, `updated_at` (TIMESTAMP)
+  * UNIQUE (`product_id`, `uom_id`)
+
+* **`product_vehicle_fitments`** (Automotive Vehicle Compatibility Matrix)
+  * `id` (BIGINT, PK, AUTO_INCREMENT)
+  * `product_id` (BIGINT, FK -> `products.id`, ON DELETE CASCADE)
+  * `make` (VARCHAR(100), INDEX) — e.g. "TOYOTA", "HONDA", "MAZDA"
+  * `model` (VARCHAR(100), INDEX) — e.g. "HILUX REVO", "CIVIC", "CX-5"
+  * `year_start` (SMALLINT UNSIGNED, NULLABLE, INDEX) — e.g. 2016
+  * `year_end` (SMALLINT UNSIGNED, NULLABLE, INDEX) — e.g. 2024
+  * `engine_code` (VARCHAR(100), NULLABLE, INDEX) — e.g. "1GD-FTV", "2ZR-FE"
+  * `chassis_code` (VARCHAR(100), NULLABLE) — e.g. "GUN126"
+  * `notes` (TEXT, NULLABLE) — Special installation/fitting instructions
+  * `created_at`, `updated_at` (TIMESTAMP)
+  * INDEX (`make`, `model`, `year_start`, `year_end`)
+
 * **`product_options`** (Variants)
   * `id` (BIGINT, PK, AUTO_INCREMENT)
   * `product_id` (BIGINT, FK -> `products.id`, ON DELETE CASCADE)
@@ -290,6 +315,9 @@ erDiagram
   * `id` (BIGINT, PK, AUTO_INCREMENT)
   * `work_order_id` (BIGINT, FK -> `work_orders.id`, ON DELETE CASCADE)
   * `product_id` (BIGINT, FK -> `products.id`) — **Crucial FK for Real Stock Deduction**
+  * `uom_conversion_id` (BIGINT, NULLABLE, FK -> `product_uom_conversions.id`, ON DELETE SET NULL)
+  * `uom_id` (BIGINT, NULLABLE, FK -> `units_of_measure.id`, ON DELETE SET NULL)
+  * `conversion_factor` (DECIMAL(12,4), NULLABLE)
   * `name` (VARCHAR(200))
   * `qty` (INT, DEFAULT 1)
   * `unit_price` (DECIMAL(14,2))
@@ -367,6 +395,10 @@ erDiagram
   * `product_id` (BIGINT, FK -> `products.id`)
   * `product_option_id` (BIGINT, NULLABLE, FK -> `product_options.id`)
   * `product_variant_id` (BIGINT, NULLABLE, FK -> `product_variants.id`, ON DELETE SET NULL)
+  * `uom_conversion_id` (BIGINT, NULLABLE, FK -> `product_uom_conversions.id`, ON DELETE SET NULL)
+  * `uom_id` (BIGINT, NULLABLE, FK -> `units_of_measure.id`, ON DELETE SET NULL)
+  * `conversion_factor` (DECIMAL(12,4), NULLABLE)
+  * `packaging_qty` (INT, NULLABLE)
   * `name` (VARCHAR(200))
   * `qty` (INT)
   * `unit_price` (DECIMAL(14,2))

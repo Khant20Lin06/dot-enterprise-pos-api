@@ -14,6 +14,10 @@ class SalesOrderItem extends Model
         'product_id',
         'product_option_id',
         'product_variant_id',
+        'uom_conversion_id',
+        'uom_id',
+        'conversion_factor',
+        'packaging_qty',
         'name',
         'qty',
         'unit_price',
@@ -24,6 +28,8 @@ class SalesOrderItem extends Model
 
     protected $casts = [
         'qty' => 'integer',
+        'conversion_factor' => 'decimal:4',
+        'packaging_qty' => 'decimal:2',
         'unit_price' => 'decimal:2',
         'cost_price' => 'decimal:2',
         'discount_amount' => 'decimal:2',
@@ -48,5 +54,15 @@ class SalesOrderItem extends Model
     public function variant(): BelongsTo
     {
         return $this->belongsTo(\App\Domains\Inventory\Models\ProductVariant::class, 'product_variant_id');
+    }
+
+    public function uomConversion(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Inventory\Models\ProductUomConversion::class, 'uom_conversion_id');
+    }
+
+    public function uom(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Inventory\Models\UnitOfMeasure::class, 'uom_id');
     }
 }

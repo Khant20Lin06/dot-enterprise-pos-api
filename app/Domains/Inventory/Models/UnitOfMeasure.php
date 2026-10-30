@@ -18,4 +18,9 @@ class UnitOfMeasure extends Model
     {
         return $this->hasMany(Product::class, 'uom_id');
     }
+
+    public function uomConversions(): HasMany
+    {
+        return $this->hasMany(ProductUomConversion::class, 'uom_id');
+    }
 }

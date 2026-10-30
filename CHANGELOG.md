@@ -8,6 +8,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Phase G Implementation: Multi-UOM Packaging Conversions & Automotive Vehicle Fitment Compatibility Matrix:**
+  - **Database Migration (`2026_10_30_000014_create_multi_uom_and_vehicle_fitment_tables.php`):**
+    - `product_uom_conversions`: Packaging unit rules (e.g. 1 Box = 10 Pcs, 1 Drum = 200 Liters) with dedicated packaging barcodes, bulk selling prices, and cost prices.
+    - `product_vehicle_fitments`: Automotive vehicle compatibility rules (Make, Model, Year Range start/end, Engine Code, Chassis Code, Fitment Notes).
+    - Added `uom_conversion_id`, `uom_id`, `conversion_factor`, `packaging_qty` to `sales_order_items`.
+    - Added `uom_conversion_id`, `uom_id`, `conversion_factor` to `work_order_items`.
+  - **Domain Models & Relationships (`ProductUomConversion`, `ProductVehicleFitment`):**
+    - `ProductUomConversion`: Relations to `Product` and `UnitOfMeasure`.
+    - `ProductVehicleFitment`: Relation to `Product`.
+    - Updated `Product` model with `uomConversions()` and `vehicleFitments()`.
+    - Updated `SalesOrderItem` and `WorkOrderItem` models with `uomConversion()` and `uom()` relationships.
+  - **Domain Actions:**
+    - `CreateProductUomConversionAction`: Enforces conversion factor > 0, prevents creating conversion rule with the product's base UOM, rejects duplicate rules per UOM, asserts unique barcodes.
+    - `AttachVehicleFitmentAction`: Validates year range validity (`year_end >= year_start`), sanitizes uppercase Make/Model strings.
+    - `SearchVehicleCompatiblePartsAction`: Performs SQLite and MySQL-compatible cross-matching between registered customer vehicles and spare parts catalog.
+    - `ResolveBarcodeAction`: Prioritizes packaging UOM barcodes first, returning `type: packaging_uom` with base product and conversion metadata.
+    - `ProcessCheckoutAction`: Automatically resolves packaging unit conversions, calculates packaging line totals, converts to base quantity (`ceil(qty * conversion_factor)`), and deducts master inventory with pessimistic locking.
+  - **RESTful API Controllers & Routes:**
+    - `ProductUomConversionController`: `GET /api/v1/products/{id}/uom-conversions`, `POST /api/v1/products/{id}/uom-conversions`, `DELETE /api/v1/products/{id}/uom-conversions/{conversionId}`.
+    - `VehicleFitmentController`: `GET /api/v1/products/{id}/fitments`, `POST /api/v1/products/{id}/fitments`, `DELETE /api/v1/products/{id}/fitments/{fitmentId}`, `GET /api/v1/vehicles/{id}/compatible-parts`, `GET /api/v1/catalog/compatibility-search`.
+  - **Pest Feature Test Suite (`tests/Feature/MultiUomAndVehicleFitmentTest.php`):**
+    - 10 comprehensive tests covering unit conversion rules, packaging barcode scanning, POS checkout with proportional base stock deductions, vehicle fitment mapping, and compatibility queries (100% pass rate).
 - **Phase F Implementation: Enterprise Red-Team Hardening & Vulnerability Remediation:**
   - **Database Migration (`2026_10_30_000013_security_and_enterprise_hardening.php`):**
     - Added `pos_session_id` foreign key to `credit_settlements` table.

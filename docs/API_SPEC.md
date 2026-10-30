@@ -95,6 +95,30 @@
 
 ### 2.2. Barcode Lookup (Ultra-Fast Dual Resolution for Scanner)
 * **Endpoint:** `GET /products/barcode/{barcode}`
+* **Response (Packaging UOM Match - 200 OK):**
+```json
+{
+  "success": true,
+  "type": "packaging_uom",
+  "data": {
+    "conversion_id": 5,
+    "product_id": 101,
+    "uom_id": 3,
+    "uom_name": "Box",
+    "conversion_factor": 12.0,
+    "barcode": "BOX-OIL-101",
+    "sell_price": 540000.00,
+    "cost_price": 400000.00
+  },
+  "product": {
+    "id": 101,
+    "name": "Total Quartz 9000 5W-30 (4L)",
+    "barcode": "8851234567890",
+    "sell_price": 58000.00,
+    "stock": 240
+  }
+}
+```
 * **Response (Variant Match - 200 OK):**
 ```json
 {
@@ -201,6 +225,108 @@
   "values": [
     { "value": "Navy Blue", "color_hex": "#000080", "sort_order": 1 },
     { "value": "Crimson Red", "color_hex": "#DC2626", "sort_order": 2 }
+  ]
+}
+```
+
+### 2.6. List Product Packaging UOM Conversions
+* **Endpoint:** `GET /products/{id}/uom-conversions`
+* **Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 5,
+      "productId": 101,
+      "uomId": 3,
+      "uomName": "Box",
+      "conversionFactor": 10.0,
+      "barcode": "BOX-OIL-101",
+      "sellPrice": 480000.00,
+      "costPrice": 380000.00,
+      "isActive": true
+    }
+  ]
+}
+```
+
+### 2.7. Create Packaging UOM Conversion
+* **Endpoint:** `POST /products/{id}/uom-conversions`
+* **Permissions:** `inventory,manage`
+* **Request Body:**
+```json
+{
+  "uom_id": 3,
+  "conversion_factor": 10.0,
+  "barcode": "BOX-OIL-101",
+  "sell_price": 480000.00,
+  "cost_price": 380000.00
+}
+```
+
+### 2.8. List Product Vehicle Fitments
+* **Endpoint:** `GET /products/{id}/fitments`
+* **Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "productId": 101,
+      "make": "TOYOTA",
+      "model": "HILUX REVO",
+      "yearStart": 2016,
+      "yearEnd": 2024,
+      "engineCode": "1GD-FTV",
+      "chassisCode": "GUN126",
+      "notes": "Direct fit for 2.8L Diesel engine"
+    }
+  ]
+}
+```
+
+### 2.9. Attach Vehicle Fitment
+* **Endpoint:** `POST /products/{id}/fitments`
+* **Permissions:** `inventory,manage`
+* **Request Body:**
+```json
+{
+  "make": "Toyota",
+  "model": "Hilux Revo",
+  "year_start": 2016,
+  "year_end": 2024,
+  "engine_code": "1GD-FTV",
+  "chassis_code": "GUN126",
+  "notes": "Direct fit for 2.8L Diesel engine"
+}
+```
+
+### 2.10. Search Vehicle Compatible Parts
+* **Endpoint 1 (By Vehicle ID):** `GET /vehicles/{id}/compatible-parts`
+* **Endpoint 2 (By Query Catalog):** `GET /catalog/compatibility-search?make=Toyota&model=Hilux&year=2020`
+* **Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 101,
+      "name": "Heavy Duty Oil Filter",
+      "barcode": "FLT-TOY-001",
+      "sell_price": 28000.00,
+      "stock": 45,
+      "vehicle_fitments": [
+        {
+          "make": "TOYOTA",
+          "model": "HILUX REVO",
+          "yearStart": 2016,
+          "yearEnd": 2024,
+          "engineCode": "1GD-FTV"
+        }
+      ]
+    }
   ]
 }
 ```

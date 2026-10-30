@@ -108,6 +108,16 @@ class Product extends Model
         return $this->hasMany(WarehouseStock::class, 'product_id');
     }
 
+    public function uomConversions(): HasMany
+    {
+        return $this->hasMany(ProductUomConversion::class, 'product_id');
+    }
+
+    public function vehicleFitments(): HasMany
+    {
+        return $this->hasMany(ProductVehicleFitment::class, 'product_id');
+    }
+
     public function isLowStock(): bool
     {
         return !$this->is_labor && $this->stock <= $this->min_stock;

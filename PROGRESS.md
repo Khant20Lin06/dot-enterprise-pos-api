@@ -27,6 +27,7 @@
 | **Phase D** | Product Variants: Size & Color EAV Matrix (Attributes Master, Cartesian Matrix, Barcode Resolution) | 🟢 Completed | 100% |
 | **Phase E** | Payment Gateways, Cashier Shifts & Reconciliation (Shift Open/Close, Blind Count, MMQR, X/Z-Reports) | 🟢 Completed | 100% |
 | **Phase F** | Enterprise Red-Team Hardening & Vulnerability Remediation (CRIT-01 to CRIT-04, HIGH-01 to HIGH-04, MED-01 to MED-03) | 🟢 Completed | 100% |
+| **Phase G** | Multi-UOM Packaging Conversions & Automotive Vehicle Fitment Matrix (Drum/Box/Carton, ACES/PIES compatibility) | 🟢 Completed | 100% |
 
 ---
 
@@ -229,3 +230,30 @@
 - [x] Pest Feature Test Suite:
   - `tests/Feature/SecurityHardeningAuditTest.php`: 12 passed (38 assertions).
   - Full Test Suite: **93 passed (452 assertions) — 100% pass rate in 5.55s**.
+
+---
+
+### Phase G: Multi-UOM Packaging Conversions & Automotive Vehicle Fitment Matrix
+- [x] Schema Migration: `2026_10_30_000014_create_multi_uom_and_vehicle_fitment_tables.php`
+  - Created `product_uom_conversions` table (`id`, `product_id`, `uom_id`, `conversion_factor`, `barcode`, `sell_price`, `cost_price`, `is_active`).
+  - Created `product_vehicle_fitments` table (`id`, `product_id`, `make`, `model`, `year_start`, `year_end`, `engine_code`, `chassis_code`, `notes`).
+  - Added packaging UOM tracking columns to `sales_order_items`: `uom_conversion_id`, `uom_id`, `conversion_factor`, `packaging_qty`.
+  - Added packaging UOM tracking columns to `work_order_items`: `uom_conversion_id`, `uom_id`, `conversion_factor`.
+- [x] Eloquent Models with Strict Relationships:
+  - `ProductUomConversion`: `belongsTo(Product::class)`, `belongsTo(UnitOfMeasure::class)`.
+  - `ProductVehicleFitment`: `belongsTo(Product::class)`.
+  - `Product`: added `uomConversions()` and `vehicleFitments()`.
+  - `UnitOfMeasure`: added `uomConversions()`.
+  - `SalesOrderItem` & `WorkOrderItem`: added `uomConversion()` and `uom()` relationships.
+- [x] Domain Business Actions:
+  - `CreateProductUomConversionAction`: Enforces positive conversion factors, blocks conversions using product's base UOM, prevents duplicate UOM rules per product, and asserts unique packaging barcodes.
+  - `AttachVehicleFitmentAction`: Validates year range boundaries (`year_end >= year_start`), sanitizes uppercase Make/Model, and links fitment criteria.
+  - `SearchVehicleCompatiblePartsAction`: Database-agnostic cross-matching between registered customer vehicles (make, model, year, engine code) and spare parts catalog.
+  - `ResolveBarcodeAction`: Ultra-fast scanner prioritization matching packaging UOM barcodes first (`type: packaging_uom`), returning base product and conversion metadata.
+  - `ProcessCheckoutAction`: Automatically resolves packaging unit conversions, calculates packaging line totals, computes base quantity `baseQty = ceil(qty * conversion_factor)`, and safely deducts master inventory with pessimistic locking.
+- [x] RESTful API Endpoints & Resources:
+  - `ProductUomConversionController`: `GET /api/v1/products/{id}/uom-conversions`, `POST /api/v1/products/{id}/uom-conversions`, `DELETE /api/v1/products/{id}/uom-conversions/{conversionId}`.
+  - `VehicleFitmentController`: `GET /api/v1/products/{id}/fitments`, `POST /api/v1/products/{id}/fitments`, `DELETE /api/v1/products/{id}/fitments/{fitmentId}`, `GET /api/v1/vehicles/{id}/compatible-parts`, `GET /api/v1/catalog/compatibility-search`.
+- [x] Pest Feature Test Suite:
+  - `tests/Feature/MultiUomAndVehicleFitmentTest.php`: 10 passed (37 assertions).
+  - Full Test Suite: **103 passed (489 assertions) — 100% pass rate in 5.49s**.

@@ -29,7 +29,9 @@ class ProductResource extends JsonResource
             'isLowStock' => ! $this->is_labor && ($this->stock <= $this->min_stock_alert),
             'isLabor' => (bool) $this->is_labor,
             'isActive' => (bool) $this->is_active,
-            'options' => $this->options->map(function ($option) {
+            'packagingUnits' => $this->relationLoaded('uomConversions') ? ProductUomConversionResource::collection($this->uomConversions) : [],
+            'vehicleFitments' => $this->relationLoaded('vehicleFitments') ? ProductVehicleFitmentResource::collection($this->vehicleFitments) : [],
+            'options' => $this->options ? $this->options->map(function ($option) {
                 return [
                     'id' => $option->id,
                     'sku' => $option->sku,
@@ -38,7 +40,7 @@ class ProductResource extends JsonResource
                     'priceModifier' => (float) $option->price_modifier,
                     'stock' => (float) $option->stock,
                 ];
-            }),
+            }) : [],
         ];
     }
 }

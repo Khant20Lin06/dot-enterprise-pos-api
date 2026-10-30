@@ -7,11 +7,13 @@ use App\Http\Controllers\Api\V1\PaymentGatewayController;
 use App\Http\Controllers\Api\V1\PosController;
 use App\Http\Controllers\Api\V1\PosSessionController;
 use App\Http\Controllers\Api\V1\ProductController;
+use App\Http\Controllers\Api\V1\ProductUomConversionController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\SalesReturnController;
 use App\Http\Controllers\Api\V1\StaffUserController;
 use App\Http\Controllers\Api\V1\StockTransferController;
+use App\Http\Controllers\Api\V1\VehicleFitmentController;
 use App\Http\Controllers\Api\V1\WarehouseController;
 use App\Http\Controllers\Api\V1\WorkOrderController;
 use Illuminate\Support\Facades\Route;
@@ -56,6 +58,20 @@ Route::prefix('v1')->group(function () {
             Route::get('/{id}/variants', [ProductController::class, 'variants']);
             Route::post('/{id}/variants/matrix', [ProductController::class, 'generateMatrix'])
                 ->middleware('permission:inventory,create');
+
+            // Multi-UOM / Packaging Unit Conversions
+            Route::get('/{id}/uom-conversions', [ProductUomConversionController::class, 'index']);
+            Route::post('/{id}/uom-conversions', [ProductUomConversionController::class, 'store'])
+                ->middleware('permission:inventory,create');
+            Route::delete('/{id}/uom-conversions/{conversionId}', [ProductUomConversionController::class, 'destroy'])
+                ->middleware('permission:inventory,edit');
+
+            // Automotive Vehicle Fitment & Compatibility
+            Route::get('/{id}/fitments', [VehicleFitmentController::class, 'index']);
+            Route::post('/{id}/fitments', [VehicleFitmentController::class, 'store'])
+                ->middleware('permission:inventory,create');
+            Route::delete('/{id}/fitments/{fitmentId}', [VehicleFitmentController::class, 'destroy'])
+                ->middleware('permission:inventory,edit');
         });
 
         // Variant Attributes Master (Size, Color, etc.)
@@ -133,6 +149,14 @@ Route::prefix('v1')->group(function () {
             Route::post('/work-orders/{id}/convert-to-invoice', [WorkOrderController::class, 'convertToInvoice'])
                 ->middleware('permission:workshop,approveJobCard');
         });
+
+        // Automotive Vehicle Fitment & Compatibility Search
+        Route::prefix('vehicles')->group(function () {
+            Route::get('/{id}/compatible-parts', [VehicleFitmentController::class, 'compatibleParts'])
+                ->middleware('permission:workshop,view');
+        });
+        Route::get('/catalog/compatibility-search', [VehicleFitmentController::class, 'search'])
+            ->middleware('permission:pos,view');
 
         // Customers & Credit Ledger
         Route::prefix('customers')->group(function () {

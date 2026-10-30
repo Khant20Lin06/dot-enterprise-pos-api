@@ -55,14 +55,33 @@ class ProcessCheckoutAction
                 $qty = (int) ($itemData['qty'] ?? 1);
                 $optionId = isset($itemData['product_option_id']) ? (int) $itemData['product_option_id'] : null;
                 $variantId = isset($itemData['product_variant_id']) ? (int) $itemData['product_variant_id'] : (isset($itemData['variant_id']) ? (int) $itemData['variant_id'] : null);
+                $uomConversionId = isset($itemData['uom_conversion_id']) ? (int) $itemData['uom_conversion_id'] : null;
                 $warehouseId = isset($data['warehouse_id']) ? (int) $data['warehouse_id'] : null;
 
-                // Pessimistic Row Locking in action
-                $product = $this->deductStockAction->execute($productId, $qty, $optionId, $warehouseId, $variantId);
+                // Enterprise Multi-UOM Resolution
+                $uomConversion = null;
+                $conversionFactor = 1.0;
+                $baseQtyToDeduct = $qty;
+
+                if ($uomConversionId) {
+                    $uomConversion = \App\Domains\Inventory\Models\ProductUomConversion::where('id', $uomConversionId)
+                        ->where('product_id', $productId)
+                        ->first();
+
+                    if ($uomConversion) {
+                        $conversionFactor = (float) $uomConversion->conversion_factor;
+                        $baseQtyToDeduct = (int) ceil($qty * $conversionFactor);
+                    }
+                }
+
+                // Pessimistic Row Locking in action: deduct baseQtyToDeduct from stock
+                $product = $this->deductStockAction->execute($productId, $baseQtyToDeduct, $optionId, $warehouseId, $variantId);
 
                 // Hardening 2: Server-Authoritative Price Validation (Anti-Price Tampering)
                 $catalogPrice = (float) ($product->sell_price ?: $product->retail_price);
-                if ($variantId) {
+                if ($uomConversion) {
+                    $catalogPrice = (float) $uomConversion->sell_price;
+                } elseif ($variantId) {
                     $variant = \App\Domains\Inventory\Models\ProductVariant::find($variantId);
                     if ($variant && (float) $variant->price > 0) {
                         $catalogPrice = (float) $variant->price;
@@ -89,10 +108,14 @@ class ProcessCheckoutAction
                     'product_id' => $product->id,
                     'product_option_id' => $optionId,
                     'product_variant_id' => $variantId,
-                    'name' => $itemData['name'] ?? $product->name,
-                    'qty' => $qty,
+                    'uom_conversion_id' => $uomConversion?->id,
+                    'uom_id' => $uomConversion?->uom_id ?? $product->uom_id,
+                    'conversion_factor' => $conversionFactor,
+                    'packaging_qty' => $uomConversion ? $qty : null,
+                    'name' => $itemData['name'] ?? ($uomConversion ? "{$product->name} ({$uomConversion->unit_name})" : $product->name),
+                    'qty' => $baseQtyToDeduct,
                     'unit_price' => $unitPrice,
-                    'cost_price' => (float) $product->cost_price,
+                    'cost_price' => (float) ($uomConversion?->cost_price ?: $product->cost_price),
                     'discount_amount' => $discountAmount,
                     'subtotal' => $subtotal,
                 ];
