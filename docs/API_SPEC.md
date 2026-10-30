@@ -171,6 +171,97 @@
 }
 ```
 
+### 3.2. Process Sales Return & Refund (ACID, Stock Restock, Points Reversal)
+* **Endpoint:** `POST /sales-returns`
+* **Authorization:** `Bearer <token>` (Requires `pos.create` permission)
+* **Request Body:**
+```json
+{
+  "sales_order_id": 452,
+  "reason": "Customer bought wrong viscosity oil",
+  "refund_method": "Cash",
+  "refund_reference": "REF-VOUCHER-001",
+  "notes": "Original bottle seal intact, verified sellable",
+  "items": [
+    {
+      "sales_order_item_id": 1024,
+      "qty": 1,
+      "item_condition": "Sellable"
+    }
+  ]
+}
+```
+* **Success Response (201 Created):**
+```json
+{
+  "success": true,
+  "message": "Sales Return #RET-20261030-0001 processed successfully.",
+  "data": {
+    "id": 1,
+    "returnNo": "RET-20261030-0001",
+    "salesOrder": {
+      "id": 452,
+      "orderNo": "INV-20261030-0042",
+      "totalAmount": 70000.00,
+      "status": "Completed"
+    },
+    "customer": {
+      "id": 1,
+      "name": "U Thant Zin",
+      "phone": "09123456789",
+      "currentDue": 0.00,
+      "loyaltyPoints": 60
+    },
+    "cashier": {
+      "id": 2,
+      "name": "Daw Hla Hla"
+    },
+    "totalRefundAmount": 58000.00,
+    "refundMethod": "Cash",
+    "refundReference": "REF-VOUCHER-001",
+    "reason": "Customer bought wrong viscosity oil",
+    "status": "Restocked",
+    "pointsDeducted": 58,
+    "notes": "Original bottle seal intact, verified sellable",
+    "items": [
+      {
+        "id": 1,
+        "salesOrderItemId": 1024,
+        "productId": 101,
+        "productName": "Total Quartz 9000 5W-30 (4L)",
+        "productBarcode": "8851234567890",
+        "qty": 1,
+        "unitPrice": 58000.00,
+        "refundSubtotal": 58000.00,
+        "itemCondition": "Sellable",
+        "restocked": true
+      }
+    ],
+    "createdAt": "2026-10-30T09:15:00.000000Z"
+  }
+}
+```
+
+### 3.3. List & Filter Sales Returns
+* **Endpoint:** `GET /sales-returns?sales_order_id=452&status=Restocked`
+* **Response (200 OK):**
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "returnNo": "RET-20261030-0001",
+      "totalRefundAmount": 58000.00,
+      "refundMethod": "Cash",
+      "status": "Restocked",
+      "items": [ ... ]
+    }
+  ],
+  "links": { ... },
+  "meta": { ... }
+}
+```
+
 ---
 
 ## 4. Workshop & Job Cards API

@@ -78,4 +78,9 @@ class SalesOrder extends Model
     {
         return $this->hasOne(WorkOrder::class, 'sales_order_id');
     }
+
+    public function salesReturns(): HasMany
+    {
+        return $this->hasMany(SalesReturn::class, 'sales_order_id');
+    }
 }

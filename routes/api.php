@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\CustomerCreditController;
 use App\Http\Controllers\Api\V1\PosController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ReportController;
+use App\Http\Controllers\Api\V1\SalesReturnController;
 use App\Http\Controllers\Api\V1\WorkOrderController;
 use Illuminate\Support\Facades\Route;
 
@@ -51,6 +52,14 @@ Route::prefix('v1')->group(function () {
             Route::get('/held-orders', [PosController::class, 'listHeldOrders']);
             Route::post('/held-orders', [PosController::class, 'parkOrder']);
             Route::delete('/held-orders/{id}', [PosController::class, 'deleteHeldOrder']);
+        });
+
+        // Sales Returns & Refunds
+        Route::prefix('sales-returns')->group(function () {
+            Route::get('/', [SalesReturnController::class, 'index']);
+            Route::post('/', [SalesReturnController::class, 'store'])
+                ->middleware('permission:pos,create');
+            Route::get('/{id}', [SalesReturnController::class, 'show']);
         });
 
         // Automotive Workshop & Job Cards

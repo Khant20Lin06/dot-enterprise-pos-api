@@ -289,6 +289,34 @@ erDiagram
   * `cashier_id` (BIGINT, FK -> `staff_users.id`)
   * `created_at` (TIMESTAMP)
 
+* **`sales_returns`** (Sales Returns & Refunds Master)
+  * `id` (BIGINT, PK, AUTO_INCREMENT)
+  * `return_no` (VARCHAR(50), UNIQUE, INDEX) — e.g. "RET-20261030-0001"
+  * `sales_order_id` (BIGINT, FK -> `sales_orders.id`, ON DELETE RESTRICT)
+  * `customer_id` (BIGINT, FK -> `customers.id`, ON DELETE RESTRICT)
+  * `cashier_id` (BIGINT, FK -> `staff_users.id`, ON DELETE RESTRICT)
+  * `total_refund_amount` (DECIMAL(14,2))
+  * `refund_method` (VARCHAR(50)) — Cash, Credit Note, KBZPay, Card Reversal, Credit Adjusted
+  * `refund_reference` (VARCHAR(100), NULLABLE)
+  * `reason` (VARCHAR(255))
+  * `status` (ENUM('Pending Inspection', 'Restocked', 'Refunded', 'Credit Adjusted', 'Rejected'), DEFAULT 'Restocked', INDEX)
+  * `notes` (TEXT, NULLABLE)
+  * `points_deducted` (INT, DEFAULT 0)
+  * `created_at`, `updated_at` (TIMESTAMP)
+
+* **`sales_return_items`** (Itemized Returned Lines)
+  * `id` (BIGINT, PK, AUTO_INCREMENT)
+  * `sales_return_id` (BIGINT, FK -> `sales_returns.id`, ON DELETE CASCADE)
+  * `sales_order_item_id` (BIGINT, FK -> `sales_order_items.id`, ON DELETE RESTRICT)
+  * `product_id` (BIGINT, FK -> `products.id`, ON DELETE RESTRICT)
+  * `product_option_id` (BIGINT, NULLABLE, FK -> `product_options.id`, ON DELETE SET NULL)
+  * `qty` (INT)
+  * `unit_price` (DECIMAL(14,2))
+  * `refund_subtotal` (DECIMAL(14,2))
+  * `item_condition` (ENUM('Sellable', 'Damaged', 'Defective', 'Scrap'), DEFAULT 'Sellable')
+  * `restocked` (BOOLEAN, DEFAULT TRUE)
+  * `created_at`, `updated_at` (TIMESTAMP)
+
 ---
 
 ### 2.6. Purchasing & Suppliers

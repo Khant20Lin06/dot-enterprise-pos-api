@@ -8,6 +8,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- **Phase A Implementation: Enterprise Sales Return & Refund Module:**
+  - **Database Migrations (`sales_returns` & `sales_return_items`):** Relational master and line-item tables with strict foreign keys to `sales_orders`, `customers`, `staff_users`, and `products`.
+  - **Domain Models & Relationships (`SalesReturn`, `SalesReturnItem`):** Fully typed Eloquent models with relations to `SalesOrder`, `Customer`, `StaffUser`, and `Product`.
+  - **Domain Action (`ProcessSaleReturnAction`):**
+    - Atomic ACID transaction with pessimistic row-locking on original order and products.
+    - Anti-Fraud Validation: Prevents returning more than purchased (`qty <= original_qty - previously_returned_qty`) and blocks returns on voided orders.
+    - Concurrency Deadlock Prevention: Consistent lock acquisition order (`usort` ascending by `product_id`).
+    - Smart Physical Inventory Handling: Re-stocks sellable items via `ReplenishStockAction` with `StockUpdatedEvent` broadcast; quarantines defective items into `stock_adjustments` (Damage / Scrap) without inflating sellable stock.
+    - Financial Accounting & Debt Settlement: Adjusts customer credit debt (`due_amount`) on `Credit Adjusted` returns.
+    - Anti-Fraud Points Reversal: Proportional reversal and deduction of customer loyalty points earned from returned items.
+    - Atomic Sequential Return Numbering: e.g. `RET-20261030-0001` via `AtomicSequenceService`.
+    - Automatic Order Status Transition: Updates original `SalesOrder` status to `Returned` when all items are fully returned.
+    - Financial Audit Logging: Records immutable audit entry in `audit_logs` (module: `sales_and_pos`, action: `sales_return_processed`).
+    - Real-Time WebSocket Broadcasting: Dispatches `SalesReturnProcessedEvent` (`return.processed`) on channel `pos.orders` with `ShouldDispatchAfterCommit`.
+  - **API Layer:**
+    - FormRequest: `CreateSalesReturnRequest` with strict validation rules.
+    - JsonResource: `SalesReturnResource` with formatted customer, order, items, and refund details.
+    - RESTful Controller: `SalesReturnController` (`store`, `index`, `show`) protected with Sanctum bearer token and `permission:pos,create`.
+    - Registered routes: `POST /api/v1/sales-returns`, `GET /api/v1/sales-returns`, `GET /api/v1/sales-returns/{id}`.
+  - **Automated Feature Test Suite (`tests/Feature/SalesReturnTest.php`):**
+    - 7 comprehensive feature tests covering sellable restock, defective quarantine, credit debt adjustment, return quantity limits, full return order status, API authentication, and listing.
+    - Total test suite status: **49 passed (203 assertions) — 100% pass rate in 2.81s**.
 - **Enterprise Forensic Module Gap Audit (`docs/ENTERPRISE_MODULES_GAP_AUDIT.md`):**
   - Completed brutal, zero-sugarcoating comparative audit of Companion Frontend (`dot-pos-next`) and Backend API (`laravel-pos-api`).
   - Uncovered 5 Critical Architectural Gaps:

@@ -70,4 +70,9 @@ class Customer extends Model
     {
         return $this->hasMany(CreditSettlement::class, 'customer_id');
     }
+
+    public function salesReturns(): HasMany
+    {
+        return $this->hasMany(\App\Domains\SalesAndPos\Models\SalesReturn::class, 'customer_id');
+    }
 }
